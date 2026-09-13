@@ -1,0 +1,85 @@
+
+create table public.web_admins(user_id uuid primary key references auth.users(id) on delete cascade);
+create table public.web_schools(id uuid primary key default gen_random_uuid(), name text not null, city text not null, currency text not null default 'CDF' check(currency in ('CDF','USD')), academic_year text not null default '2025-2026', terms int not null default 3 check(terms between 1 and 4), periods_per_term int not null default 2 check(periods_per_term between 1 and 4));
+create table public.web_memberships(user_id uuid references auth.users(id) on delete cascade, school_id uuid references public.web_schools(id), role text not null check(role in ('subadmin','student')), active boolean not null default true, primary key(user_id,school_id));
+alter table public.web_admins enable row level security;
+alter table public.web_memberships enable row level security;
+alter table public.web_schools enable row level security;
+create policy own_admin on public.web_admins for select to authenticated using(user_id=(select auth.uid()));
+create function public.web_is_admin() returns boolean language sql stable security invoker set search_path='' as $$ select exists(select 1 from public.web_admins where user_id=(select auth.uid())) $$;
+create policy memberships_read on public.web_memberships for select to authenticated using(user_id=(select auth.uid()) or public.web_is_admin());
+create policy memberships_write on public.web_memberships for all to authenticated using(public.web_is_admin()) with check(public.web_is_admin());
+create function public.web_manage(sid uuid) returns boolean language sql stable security invoker set search_path='' as $$ select public.web_is_admin() or exists(select 1 from public.web_memberships where user_id=(select auth.uid()) and school_id=sid and role='subadmin' and active) $$;
+create function public.web_access(sid uuid) returns boolean language sql stable security invoker set search_path='' as $$ select public.web_is_admin() or exists(select 1 from public.web_memberships where user_id=(select auth.uid()) and school_id=sid and active) $$;
+create policy schools_read on public.web_schools for select to authenticated using(public.web_access(id));
+create policy schools_update on public.web_schools for update to authenticated using(public.web_manage(id)) with check(public.web_manage(id));
+create policy schools_insert on public.web_schools for insert to authenticated with check(public.web_is_admin());
+create table public.web_students(id uuid primary key default gen_random_uuid(),school_id uuid not null references public.web_schools(id),user_id uuid unique references auth.users(id),name text not null, class_name text not null default '1ère primaire', sex text check(sex in ('F','M')), birth_date date, unique(id,school_id));
+create table public.web_subjects(id uuid primary key default gen_random_uuid(),school_id uuid not null references public.web_schools(id),name text not null, domain text not null, period_max numeric not null check(period_max>0), exam_max numeric not null check(exam_max>0), sort_order int not null, unique(id,school_id));
+create table public.web_assignments(id uuid primary key default gen_random_uuid(),school_id uuid not null references public.web_schools(id),subject_id uuid not null,class_name text not null,title text not null,term int not null check(term between 1 and 4),period int not null check(period between 0 and 4),max_score numeric not null check(max_score>0),due_date date not null,published boolean not null default false,foreign key(subject_id,school_id) references public.web_subjects(id,school_id),unique(id,school_id));
+create table public.web_marks(id uuid primary key default gen_random_uuid(),school_id uuid not null,student_id uuid not null,assignment_id uuid not null,score numeric not null check(score>=0),foreign key(student_id,school_id) references public.web_students(id,school_id),foreign key(assignment_id,school_id) references public.web_assignments(id,school_id),unique(student_id,assignment_id));
+create table public.web_payments(id uuid primary key default gen_random_uuid(),school_id uuid not null,student_id uuid not null,label text not null,amount numeric not null check(amount>0),currency text not null check(currency in ('CDF','USD')),paid_on date not null,reference text not null,foreign key(student_id,school_id) references public.web_students(id,school_id));
+create table public.web_messages(id uuid primary key default gen_random_uuid(),school_id uuid not null references public.web_schools(id),title text not null,body text not null,created_at timestamptz not null default now());
+create table public.web_timetable(id uuid primary key default gen_random_uuid(),school_id uuid not null references public.web_schools(id),class_name text not null,day int not null check(day between 1 and 5),starts_at time not null,ends_at time not null,subject text not null,teacher text not null,check(ends_at>starts_at));
+alter table public.web_students enable row level security;
+create policy students_read on public.web_students for select to authenticated using(public.web_manage(school_id) or (user_id=(select auth.uid()) and public.web_access(school_id)));
+create policy students_write on public.web_students for all to authenticated using(public.web_manage(school_id)) with check(public.web_manage(school_id));
+create function public.web_own_student(sid uuid) returns boolean language sql stable security invoker set search_path='' as $$ select exists(select 1 from public.web_students where id=sid and user_id=(select auth.uid()) and public.web_access(school_id)) $$;
+create function public.web_class(sid uuid, cname text) returns boolean language sql stable security invoker set search_path='' as $$ select public.web_manage(sid) or exists(select 1 from public.web_students where school_id=sid and class_name=cname and user_id=(select auth.uid()) and public.web_access(sid)) $$;
+alter table public.web_subjects enable row level security;
+create policy subjects_read on public.web_subjects for select to authenticated using(public.web_access(school_id));
+create policy subjects_write on public.web_subjects for all to authenticated using(public.web_manage(school_id)) with check(public.web_manage(school_id));
+alter table public.web_assignments enable row level security;
+create policy assignments_read on public.web_assignments for select to authenticated using(public.web_manage(school_id) or (published and public.web_class(school_id,class_name)));
+create policy assignments_write on public.web_assignments for all to authenticated using(public.web_manage(school_id)) with check(public.web_manage(school_id));
+alter table public.web_marks enable row level security;
+create policy marks_read on public.web_marks for select to authenticated using(public.web_manage(school_id) or (public.web_own_student(student_id) and exists(select 1 from public.web_assignments a where a.id=assignment_id and a.published)));
+create policy marks_write on public.web_marks for all to authenticated using(public.web_manage(school_id)) with check(public.web_manage(school_id));
+create function public.web_validate_mark() returns trigger language plpgsql security invoker set search_path='' as $$ declare maximum numeric; student_class text; assignment_class text; begin
+select max_score,class_name into maximum,assignment_class from public.web_assignments where id=new.assignment_id and school_id=new.school_id;
+select class_name into student_class from public.web_students where id=new.student_id and school_id=new.school_id;
+if maximum is null or student_class is null or student_class<>assignment_class or new.score>maximum then raise exception 'Invalid mark or class'; end if;
+return new; end $$;
+create trigger validate_mark before insert or update on public.web_marks for each row execute function public.web_validate_mark();
+create function public.web_validate_assignment() returns trigger language plpgsql security invoker set search_path='' as $$ begin
+if exists(select 1 from public.web_marks where assignment_id=new.id and score>new.max_score) then raise exception 'Maximum below existing marks'; end if;
+if exists(select 1 from public.web_marks where assignment_id=new.id) and (new.class_name<>old.class_name or new.school_id<>old.school_id) then raise exception 'Assignment already graded'; end if;
+return new; end $$;
+create trigger validate_assignment before update on public.web_assignments for each row execute function public.web_validate_assignment();
+alter table public.web_payments enable row level security;
+create policy payments_read on public.web_payments for select to authenticated using(public.web_manage(school_id) or public.web_own_student(student_id));
+create policy payments_write on public.web_payments for all to authenticated using(public.web_manage(school_id)) with check(public.web_manage(school_id));
+alter table public.web_messages enable row level security;
+create policy messages_read on public.web_messages for select to authenticated using(public.web_access(school_id));
+create policy messages_write on public.web_messages for all to authenticated using(public.web_manage(school_id)) with check(public.web_manage(school_id));
+alter table public.web_timetable enable row level security;
+create policy timetable_read on public.web_timetable for select to authenticated using(public.web_class(school_id,class_name));
+create policy timetable_write on public.web_timetable for all to authenticated using(public.web_manage(school_id)) with check(public.web_manage(school_id));
+grant select on public.web_admins to authenticated;
+grant select,insert,update,delete on public.web_memberships,public.web_schools,public.web_students,public.web_subjects,public.web_assignments,public.web_marks,public.web_payments,public.web_messages,public.web_timetable to authenticated;
+grant all on public.web_admins,public.web_memberships,public.web_schools,public.web_students,public.web_subjects,public.web_assignments,public.web_marks,public.web_payments,public.web_messages,public.web_timetable to service_role;
+revoke all on public.web_admins,public.web_memberships,public.web_schools,public.web_students,public.web_subjects,public.web_assignments,public.web_marks,public.web_payments,public.web_messages,public.web_timetable from anon;
+create index web_students_school on public.web_students(school_id);
+create index web_memberships_school on public.web_memberships(school_id);
+create index web_subjects_school on public.web_subjects(school_id);
+create index web_assignments_subject on public.web_assignments(subject_id,school_id);
+create index web_assignments_school on public.web_assignments(school_id);
+create index web_marks_assignment on public.web_marks(assignment_id,school_id);
+create index web_marks_student on public.web_marks(student_id,school_id);
+create index web_payments_student on public.web_payments(student_id,school_id);
+create index web_messages_school on public.web_messages(school_id);
+create index web_timetable_school on public.web_timetable(school_id);
+
+create function public.web_validate_calendar() returns trigger language plpgsql security invoker set search_path='' as $$ begin
+if exists(select 1 from public.web_assignments where school_id=new.id and (term>new.terms or period>new.periods_per_term)) then raise exception 'Calendar excludes existing assignments'; end if;
+return new; end $$;
+create trigger validate_calendar before update on public.web_schools for each row execute function public.web_validate_calendar();
+create function public.web_assignment_calendar() returns trigger language plpgsql security invoker set search_path='' as $$ declare t int; p int; begin
+select terms,periods_per_term into t,p from public.web_schools where id=new.school_id;
+if t is null or new.term>t or new.period>p then raise exception 'Assignment outside configured calendar'; end if;
+return new; end $$;
+create trigger assignment_calendar before insert or update on public.web_assignments for each row execute function public.web_assignment_calendar();
+create function public.web_student_class_guard() returns trigger language plpgsql security invoker set search_path='' as $$ begin
+if (new.class_name<>old.class_name or new.school_id<>old.school_id) and exists(select 1 from public.web_marks where student_id=old.id) then raise exception 'Use an enrollment transition for a graded student'; end if;
+return new; end $$;
+create trigger student_class_guard before update on public.web_students for each row execute function public.web_student_class_guard();
