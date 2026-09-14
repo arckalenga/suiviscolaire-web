@@ -108,6 +108,10 @@ function App() {
     return () => window.removeEventListener("hashchange", change);
   }, []);
   const requestId = useRef(0);
+  const selectedScope = useRef<string | null>(null);
+  const sessionScope = useRef<string | null>(null);
+  selectedScope.current = selected?.id || null;
+  sessionScope.current = session?.user.id || null;
   const isStaff =
     main || members.some((m) => m.role === "subadmin" && m.active);
   const manager =
@@ -139,6 +143,8 @@ function App() {
     if (session) void loadSchools();
   }, [session?.user.id]);
   async function loadSchools() {
+    if (!session) return;
+    const userId = session.user.id;
     setBusy(true);
     setError("");
     const [s, m, a] = await Promise.all([
@@ -146,6 +152,7 @@ function App() {
       db.from("web_memberships").select("*").eq("user_id", session!.user.id),
       db.from("web_admins").select("*").eq("user_id", session!.user.id),
     ]);
+    if (sessionScope.current !== userId) return;
     if (s.error || m.error || a.error)
       setError("Impossible de charger les établissements. Réessayez.");
     else {
@@ -168,7 +175,7 @@ function App() {
     };
   }, [selected?.id]);
   async function loadData(refresh = false) {
-    if (!selected) return;
+    if (!selected || selectedScope.current !== selected.id) return;
     const currentRequest = ++requestId.current;
     if (!refresh) {
       setBusy(true);
@@ -199,7 +206,11 @@ function App() {
         .select("notification_id")
         .limit(10000);
       if (readResult.error) throw readResult.error;
-      if (currentRequest !== requestId.current) return;
+      if (
+        currentRequest !== requestId.current ||
+        selectedScope.current !== selected.id
+      )
+        return;
       const next = Object.fromEntries(
         keys.map((k, i) => [k, result[i]]),
       ) as Data;
