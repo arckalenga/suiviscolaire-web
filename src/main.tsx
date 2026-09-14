@@ -19,14 +19,27 @@ import {
   LogOut,
   ArrowLeft,
   ArrowRight,
-  Search,
   Printer,
   Check,
   School,
   ChevronRight,
+  Bell,
+  CreditCard,
 } from "lucide-react";
 import { db } from "./client";
 import "./style.css";
+import "./acadexis.css";
+import { Landing } from "./Landing";
+import {
+  MainControls,
+  StudentActions,
+  StudentsManager,
+  ClassManager,
+  GradeManager,
+  CommunicationsManager,
+  Notifications,
+  OnlinePayment,
+} from "./management";
 type Row = Record<string, any>;
 type Data = {
   students: Row[];
@@ -36,6 +49,8 @@ type Data = {
   payments: Row[];
   messages: Row[];
   timetable: Row[];
+  classes: Row[];
+  notifications: Row[];
 };
 const empty: Data = {
   students: [],
@@ -45,6 +60,8 @@ const empty: Data = {
   payments: [],
   messages: [],
   timetable: [],
+  classes: [],
+  notifications: [],
 };
 const money = (n: number, c: string) =>
   new Intl.NumberFormat("fr-CD", {
@@ -57,11 +74,14 @@ const date = (s: string) =>
 const nav = [
   ["overview", "Vue d’ensemble", LayoutDashboard],
   ["students", "Élèves", Users],
+  ["classes", "Classes & cours", GraduationCap],
   ["marks", "Notes & devoirs", BookOpen],
   ["bulletin", "Bulletins", GraduationCap],
   ["payments", "Paiements", Wallet],
   ["messages", "Communications", MessageSquare],
   ["timetable", "Emploi du temps", CalendarDays],
+  ["notifications", "Notifications", Bell],
+  ["online", "Payer en ligne", CreditCard],
   ["settings", "Paramètres", Settings],
 ] as const;
 function App() {
@@ -76,9 +96,20 @@ function App() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [studentId, setStudentId] = useState(""),
-    [search, setSearch] = useState("");
+    [studentId, setStudentId] = useState("");
+  const [publicPage, setPublicPage] = useState(
+    window.location.hash === "#connexion" ? "login" : "home",
+  );
+  const [reads, setReads] = useState<string[]>([]);
+  useEffect(() => {
+    const change = () =>
+      setPublicPage(window.location.hash === "#connexion" ? "login" : "home");
+    window.addEventListener("hashchange", change);
+    return () => window.removeEventListener("hashchange", change);
+  }, []);
   const requestId = useRef(0);
+  const isStaff =
+    main || members.some((m) => m.role === "subadmin" && m.active);
   const manager =
     main ||
     members.some(
@@ -97,6 +128,9 @@ function App() {
         setSchools([]);
         setSelected(null);
         setData(empty);
+        setReads([]);
+        setTab("overview");
+        setMain(false);
       }
     });
     return () => subscription.unsubscribe();
@@ -118,7 +152,12 @@ function App() {
       setSchools(s.data || []);
       setMembers(m.data || []);
       setMain(!!a.data?.length);
-      if (s.data?.length === 1) setSelected(s.data[0]);
+      if (
+        s.data?.length === 1 &&
+        !a.data?.length &&
+        m.data?.some((x) => x.role === "student")
+      )
+        setSelected(s.data[0]);
     }
     setBusy(false);
   }
@@ -128,58 +167,63 @@ function App() {
       requestId.current++;
     };
   }, [selected?.id]);
-  async function loadData() {
+  async function loadData(refresh = false) {
     if (!selected) return;
     const currentRequest = ++requestId.current;
-    setBusy(true);
+    if (!refresh) {
+      setBusy(true);
+      setData(empty);
+    }
     setError("");
-    setData(empty);
-    const keys = Object.keys(empty) as (keyof Data)[];
-    const result = await Promise.all(
-      keys.map((k) =>
-        db
-          .from("web_" + k)
-          .select("*")
-          .eq("school_id", selected.id)
-          .limit(10000),
-      ),
-    );
-    if (currentRequest !== requestId.current) return;
-    if (result.some((r) => r.error)) {
-      setError(
-        "Chargement incomplet. Vérifiez votre connexion puis actualisez.",
+    try {
+      const keys = Object.keys(empty) as (keyof Data)[];
+      const result = await Promise.all(
+        keys.map(async (key) => {
+          const rows: Row[] = [];
+          for (let offset = 0; ; offset += 1000) {
+            const r = await db
+              .from("web_" + key)
+              .select("*")
+              .eq("school_id", selected.id)
+              .order("id")
+              .range(offset, offset + 999);
+            if (r.error) throw r.error;
+            rows.push(...r.data);
+            if (r.data.length < 1000) break;
+          }
+          return rows;
+        }),
       );
-      setBusy(false);
-      return;
+      const readResult = await db
+        .from("web_notification_reads")
+        .select("notification_id")
+        .limit(10000);
+      if (readResult.error) throw readResult.error;
+      if (currentRequest !== requestId.current) return;
+      const next = Object.fromEntries(
+        keys.map((k, i) => [k, result[i]]),
+      ) as Data;
+      next.subjects.sort((a, b) => a.sort_order - b.sort_order);
+      setData(next);
+      setReads((readResult.data || []).map((r) => r.notification_id));
+      setStudentId((id) =>
+        next.students.some((s) => s.id === id)
+          ? id
+          : next.students.find((s) => !s.archived)?.id || "",
+      );
+    } catch {
+      if (currentRequest === requestId.current)
+        setError("Impossible de charger les informations. Réessayez.");
+    } finally {
+      if (currentRequest === requestId.current) setBusy(false);
     }
-    // Fetch marks in pages: the Data API limits each response to 1,000 rows.
-    let marks: Row[] = [];
-    for (let offset = 0; ; offset += 1000) {
-      const r = await db
-        .from("web_marks")
-        .select("*")
-        .eq("school_id", selected.id)
-        .order("id")
-        .range(offset, offset + 999);
-      if (r.error) {
-        setError("Impossible de charger les notes.");
-        setBusy(false);
-        return;
-      }
-      marks.push(...r.data);
-      if (r.data.length < 1000) break;
-    }
-    if (currentRequest !== requestId.current) return;
-    const next = Object.fromEntries(
-      keys.map((k, i) => [k, result[i].data || []]),
-    ) as Data;
-    next.marks = marks;
-    next.subjects.sort((a, b) => a.sort_order - b.sort_order);
-    setData(next);
-    setStudentId((id) =>
-      next.students.some((s) => s.id === id) ? id : next.students[0]?.id || "",
-    );
-    setBusy(false);
+  }
+  async function refreshReads() {
+    const r = await db
+      .from("web_notification_reads")
+      .select("notification_id")
+      .limit(10000);
+    if (!r.error) setReads((r.data || []).map((x) => x.notification_id));
   }
   async function mutate(table: string, values: Row, id?: string) {
     setError("");
@@ -199,7 +243,30 @@ function App() {
     return true;
   }
   if (!ready) return <div className="loading">Ouverture de SuiviScolaire…</div>;
-  if (!session) return <Login onError={setError} error={error} />;
+  if (!session)
+    return publicPage === "login" ? (
+      <>
+        <button
+          className="return-home"
+          onClick={() => {
+            window.location.hash = "accueil";
+            setPublicPage("home");
+            setError("");
+          }}
+        >
+          ← Retour à l’accueil
+        </button>
+        <Login onError={setError} error={error} />
+      </>
+    ) : (
+      <Landing
+        login={() => {
+          window.location.hash = "connexion";
+          setPublicPage("login");
+          setError("");
+        }}
+      />
+    );
   const student = data.students.find((s) => s.id === studentId);
   const ownMarks = data.marks.filter((m) => m.student_id === studentId);
   const assigned = data.assignments.filter(
@@ -250,7 +317,7 @@ function App() {
         <div className="role-label">
           {main
             ? "ADMINISTRATION PRINCIPALE"
-            : manager
+            : isStaff
               ? "ADMINISTRATION SCOLAIRE"
               : "ESPACE ÉLÈVE"}
         </div>
@@ -273,7 +340,8 @@ function App() {
           {selected &&
             nav
               .filter(
-                ([id]) => manager || !["students", "settings"].includes(id),
+                ([id]) =>
+                  manager || !["students", "classes", "settings"].includes(id),
               )
               .map(([id, label, Icon]) => (
                 <button
@@ -292,13 +360,13 @@ function App() {
           </div>
           <div className="account">
             <span className="avatar">
-              {main ? "AP" : manager ? "SA" : "ÉL"}
+              {main ? "AP" : isStaff ? "SA" : "ÉL"}
             </span>
             <span>
               <strong>
                 {main
                   ? "Administrateur"
-                  : manager
+                  : isStaff
                     ? "Sous-administrateur"
                     : "Élève"}
               </strong>
@@ -308,7 +376,7 @@ function App() {
           <button
             className="logout"
             onClick={async () => {
-              await db.auth.signOut();
+              await db.auth.signOut({ scope: "local" });
               setSelected(null);
               setData(empty);
             }}
@@ -353,6 +421,7 @@ function App() {
                 </div>
                 <span className="count">{schools.length} établissements</span>
               </div>
+              {main && <MainControls schools={schools} refresh={loadSchools} />}
               <div className="welcome">
                 <div>
                   <span className="pill">Une vue claire, chaque jour</span>
@@ -435,12 +504,22 @@ function App() {
                 <>
                   {tab === "overview" && (
                     <>
+                      {!manager && (
+                        <StudentActions
+                          go={go}
+                          unread={
+                            data.notifications.filter(
+                              (n) => !reads.includes(n.id),
+                            ).length
+                          }
+                        />
+                      )}
                       <div className="stats">
                         <Stat
                           label={manager ? "Élèves inscrits" : "Ma classe"}
                           value={
                             manager
-                              ? data.students.length
+                              ? data.students.filter((s) => !s.archived).length
                               : student?.class_name || "—"
                           }
                           icon={<Users />}
@@ -470,51 +549,53 @@ function App() {
                         />
                       </div>
                       <div className="two-columns">
-                        <section className="panel">
-                          <div className="panel-title">
-                            <h2>Votre quotidien</h2>
-                            <span className="tag">Accès rapide</span>
-                          </div>
-                          <div className="quick-grid">
-                            {[
-                              [
-                                "marks",
-                                "Consulter les notes",
-                                "Devoirs et évaluations",
-                                BookOpen,
-                              ],
-                              [
-                                "bulletin",
-                                "Ouvrir un bulletin",
-                                "Résultats par trimestre",
-                                GraduationCap,
-                              ],
-                              [
-                                "payments",
-                                "Suivre les paiements",
-                                "Historique en CDF et USD",
-                                Wallet,
-                              ],
-                              [
-                                "timetable",
-                                "Voir les cours",
-                                "Le programme de la semaine",
-                                CalendarDays,
-                              ],
-                            ].map(([id, title, sub, Icon]: any) => (
-                              <button
-                                className="quick"
-                                key={id}
-                                onClick={() => go(id)}
-                              >
-                                <Icon />
-                                <strong>{title}</strong>
-                                <small>{sub}</small>
-                                <ArrowRight size={16} />
-                              </button>
-                            ))}
-                          </div>
-                        </section>
+                        {manager && (
+                          <section className="panel">
+                            <div className="panel-title">
+                              <h2>Votre quotidien</h2>
+                              <span className="tag">Accès rapide</span>
+                            </div>
+                            <div className="quick-grid">
+                              {[
+                                [
+                                  "marks",
+                                  "Consulter les notes",
+                                  "Devoirs et évaluations",
+                                  BookOpen,
+                                ],
+                                [
+                                  "bulletin",
+                                  "Ouvrir un bulletin",
+                                  "Résultats par trimestre",
+                                  GraduationCap,
+                                ],
+                                [
+                                  "payments",
+                                  "Suivre les paiements",
+                                  "Historique en CDF et USD",
+                                  Wallet,
+                                ],
+                                [
+                                  "timetable",
+                                  "Voir les cours",
+                                  "Le programme de la semaine",
+                                  CalendarDays,
+                                ],
+                              ].map(([id, title, sub, Icon]: any) => (
+                                <button
+                                  className="quick"
+                                  key={id}
+                                  onClick={() => go(id)}
+                                >
+                                  <Icon />
+                                  <strong>{title}</strong>
+                                  <small>{sub}</small>
+                                  <ArrowRight size={16} />
+                                </button>
+                              ))}
+                            </div>
+                          </section>
+                        )}
                         <section className="panel">
                           <div className="panel-title">
                             <h2>À la une</h2>
@@ -541,183 +622,55 @@ function App() {
                     </>
                   )}
                   {tab === "students" && manager && (
-                    <section className="panel">
-                      <div className="panel-title">
-                        <h2>Élèves de l’établissement</h2>
-                        <label className="search">
-                          <Search size={17} />
-                          <input
-                            placeholder="Rechercher un élève…"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                          />
-                        </label>
-                      </div>
-                      <Table headers={["Élève", "Classe", "Sexe", "Dossier"]}>
-                        {data.students
-                          .filter((s) =>
-                            s.name.toLowerCase().includes(search.toLowerCase()),
-                          )
-                          .map((s) => (
-                            <tr key={s.id}>
-                              <td>
-                                <strong>{s.name}</strong>
-                              </td>
-                              <td>{s.class_name}</td>
-                              <td>{s.sex}</td>
-                              <td>
-                                <button
-                                  className="text-button"
-                                  onClick={() => {
-                                    setStudentId(s.id);
-                                    go("marks");
-                                  }}
-                                >
-                                  Voir les résultats →
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                      </Table>
-                    </section>
+                    <StudentsManager
+                      school={selected}
+                      students={data.students}
+                      classes={data.classes}
+                      refresh={() => loadData(true)}
+                      view={(id) => {
+                        setStudentId(id);
+                        go("bulletin");
+                      }}
+                    />
                   )}
-                  {tab === "marks" && (
-                    <>
-                      <StudentPicker />
-                      {manager && (
-                        <details className="panel form-panel">
-                          <summary>Ajouter un devoir ou une note</summary>
-                          <div className="two-columns">
-                            <Form
-                              title="Nouveau devoir"
-                              onSubmit={async (f) =>
-                                mutate("web_assignments", {
-                                  school_id: selected.id,
-                                  subject_id: f.subject_id,
-                                  class_name: f.class_name,
-                                  title: f.title,
-                                  term: Number(f.term),
-                                  period: Number(f.period),
-                                  max_score: Number(f.max_score),
-                                  due_date: f.due_date,
-                                  published: f.published === "on",
-                                })
-                              }
-                            >
-                              <Field label="Intitulé" name="title" />
-                              <label>
-                                Branche
-                                <select name="subject_id">
-                                  {data.subjects.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                              <Field
-                                label="Classe"
-                                name="class_name"
-                                value="1ère primaire"
-                              />
-                              <Field
-                                label="Trimestre"
-                                name="term"
-                                type="number"
-                                value="1"
-                                min={1}
-                                max={selected.terms}
-                              />
-                              <Field
-                                label="Période (0 = examen)"
-                                name="period"
-                                type="number"
-                                value="1"
-                                min={0}
-                                max={selected.periods_per_term}
-                              />
-                              <Field
-                                label="Maximum"
-                                name="max_score"
-                                type="number"
-                                min={1}
-                                value="20"
-                              />
-                              <Field label="Date" name="due_date" type="date" />
-                              <label className="checkbox">
-                                <input name="published" type="checkbox" />{" "}
-                                Publier pour les élèves
-                              </label>
-                            </Form>
-                            <Form
-                              title="Enregistrer une note"
-                              onSubmit={async (f) => {
-                                const existing = data.marks.find(
-                                  (m) =>
-                                    m.student_id === studentId &&
-                                    m.assignment_id === f.assignment_id,
-                                );
-                                return mutate(
-                                  "web_marks",
-                                  {
-                                    school_id: selected.id,
-                                    student_id: studentId,
-                                    assignment_id: f.assignment_id,
-                                    score: Number(f.score),
-                                  },
-                                  existing?.id,
-                                );
-                              }}
-                            >
-                              <p>Élève : {student?.name}</p>
-                              <label>
-                                Devoir
-                                <select name="assignment_id">
-                                  {data.assignments
-                                    .filter(
-                                      (a) =>
-                                        a.class_name === student?.class_name,
-                                    )
-                                    .map((a) => (
-                                      <option key={a.id} value={a.id}>
-                                        T{a.term} · {a.title} / {a.max_score}
-                                      </option>
-                                    ))}
-                                </select>
-                              </label>
-                              <Field
-                                label="Points obtenus"
-                                name="score"
-                                type="number"
-                                min={0}
-                                step=".1"
-                              />
-                            </Form>
-                          </div>
-                        </details>
-                      )}
+                  {tab === "classes" && manager && (
+                    <ClassManager
+                      school={selected}
+                      classes={data.classes}
+                      subjects={data.subjects}
+                      refresh={() => loadData(true)}
+                    />
+                  )}
+                  {tab === "marks" &&
+                    (manager ? (
+                      <GradeManager
+                        school={selected}
+                        classes={data.classes}
+                        subjects={data.subjects}
+                        students={data.students}
+                        assignments={data.assignments}
+                        marks={data.marks}
+                        refresh={() => loadData(true)}
+                      />
+                    ) : (
                       <section className="panel">
                         <div className="panel-title">
-                          <h2>
-                            {manager
-                              ? "Résultats de " + student?.name
-                              : "Mes notes"}
-                          </h2>
+                          <h2>Mes notes</h2>
                           <span className="tag">{average} %</span>
                         </div>
                         <Table
                           headers={[
                             "Évaluation",
+                            "Type",
                             "Trimestre",
                             "Date",
                             "Note",
-                            "État",
                           ]}
                         >
                           {data.assignments
                             .filter((a) => a.class_name === student?.class_name)
-                            .sort(
-                              (a, b) => a.term - b.term || a.period - b.period,
+                            .sort((a, b) =>
+                              b.due_date.localeCompare(a.due_date),
                             )
                             .map((a) => {
                               const m = ownMarks.find(
@@ -728,6 +681,7 @@ function App() {
                                   <td>
                                     <strong>{a.title}</strong>
                                   </td>
+                                  <td>{a.kind}</td>
                                   <td>T{a.term}</td>
                                   <td>{date(a.due_date)}</td>
                                   <td>
@@ -736,31 +690,21 @@ function App() {
                                       <small>/ {a.max_score}</small>
                                     </span>
                                   </td>
-                                  <td>
-                                    {a.published ? (
-                                      <span className="status">Publiée</span>
-                                    ) : (
-                                      <button
-                                        className="text-button"
-                                        onClick={() =>
-                                          mutate(
-                                            "web_assignments",
-                                            { published: true },
-                                            a.id,
-                                          )
-                                        }
-                                      >
-                                        Publier
-                                      </button>
-                                    )}
-                                  </td>
                                 </tr>
                               );
                             })}
                         </Table>
                       </section>
-                    </>
+                    ))}
+                  {tab === "notifications" && (
+                    <Notifications
+                      items={data.notifications}
+                      reads={reads}
+                      go={go}
+                      refresh={refreshReads}
+                    />
                   )}
+                  {tab === "online" && <OnlinePayment />}
                   {tab === "bulletin" && (
                     <>
                       <div className="toolbar no-print">
@@ -864,25 +808,12 @@ function App() {
                   {tab === "messages" && (
                     <>
                       {manager && (
-                        <details className="panel form-panel">
-                          <summary>Publier une communication à l’école</summary>
-                          <Form
-                            title="Nouvelle communication"
-                            onSubmit={async (f) =>
-                              mutate("web_messages", {
-                                school_id: selected.id,
-                                title: f.title,
-                                body: f.body,
-                              })
-                            }
-                          >
-                            <Field label="Titre" name="title" />
-                            <label>
-                              Message
-                              <textarea name="body" required rows={4} />
-                            </label>
-                          </Form>
-                        </details>
+                        <CommunicationsManager
+                          school={selected}
+                          students={data.students}
+                          classes={data.classes}
+                          refresh={() => loadData(true)}
+                        />
                       )}
                       <div className="message-list">
                         {data.messages
@@ -897,6 +828,18 @@ function App() {
                                   "fr-FR",
                                 )}
                               </div>
+                              {manager && (
+                                <span className="tag">
+                                  {m.audience === "class"
+                                    ? "Classe : " + m.class_name
+                                    : m.audience === "student"
+                                      ? "Élève : " +
+                                        (data.students.find(
+                                          (s) => s.id === m.student_id,
+                                        )?.name || "Élève")
+                                      : "Toute l’école"}
+                                </span>
+                              )}
                               <h2>{m.title}</h2>
                               <p className="message-body">{m.body}</p>
                             </article>

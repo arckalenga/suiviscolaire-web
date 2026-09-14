@@ -1,41 +1,39 @@
 # Next steps
 
-This first release prioritizes a working demonstration on the new non-PHP architecture.
+## Explicitly deferred
+
+- Connect online payments when a provider is selected. The student dashboard includes a clearly labeled coming-soon screen. Existing received-payment records remain available in CDF and USD.
 
 ## Before using real student data
 
-- Add administrator account invitation, password reset and first-login password change flows.
-- Add account lifecycle management and an audit trail for edits to marks and payment records.
+- Configure password reset email delivery, first-login password changes and production Auth URL allowlists.
+- Add an audit trail for profile, grade, publication and payment changes.
 - Review school data retention, consent, backups and recovery.
-- Configure production Auth URL allowlists, email delivery, rate limits and abuse monitoring.
-- Replace demo accounts and data with institution-approved records.
+- Replace fictional demo data with institution-approved records.
+- Enable leaked-password protection where supported. See [Supabase password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). The security advisor reports this existing warning; no exposed-table or function security finding was reported.
 
-## School administration
+## Further school management
 
-- Add school/class/student creation and enrollment screens, teacher roles and per-course assignments.
-- Support separate academic-year records and class-level calendar settings. This release uses one demo year per school.
-- Add attendance, absences, rankings, promotion decisions and teacher comments.
-- Support editing/removing timetable slots and overlap validation.
+- Add multi-year enrollments and a guided class transition for students already graded.
+- Add teacher roles, per-course assignments, attendance, absences, rankings and promotion decisions.
 - Add fee schedules, invoices, outstanding balances and downloadable receipts.
-- Connect an authorized payment provider for real online payments; current payments are recorded receipts only.
-- Add targeted messages, replies, notification delivery and read receipts.
+- Add editing/removing timetable slots and overlap validation.
+- Add replies and external notification delivery. Current communications and notifications are in-app.
+- Add editing an existing sub-admin's school assignments and administrator-driven account recovery.
+- Student Excel imports currently create new students; existing students are edited individually.
+- Improve large-network notification pagination and archival.
 
 ## RDC report cards
 
-- Refine the complete official primary template: institution codes, permanent student numbers, educational province, domain subtotals, conduct and application, rankings, decisions and signatures.
-- Add grade-level templates and class-specific maxima.
-- Add a reviewed publication workflow and immutable report-card snapshots.
-- Current report cards are calculated from published assignments and current marks. Missing evaluations show a dash; they are not assumed to be zero.
-- Reference maxima changes apply to settings only; existing evaluation maxima remain unchanged.
-- Validate final print layout with each school and the relevant education authority.
+- Preserve the implemented primary demonstration with configurable school periods and reference maxima.
+- Refine official institution codes, permanent student numbers, educational province, domain subtotals, conduct/application, rankings and signatures.
+- Add grade-level/class-specific templates and immutable publication snapshots.
+- Current bulletins calculate from published assignments and current marks. Missing evaluations are shown as a dash, never silently treated as zero.
+- Validate the final official print template with each school and the relevant education authority.
 
 ## Engineering
 
-- Generate Supabase TypeScript schema types and split the first-release UI into feature modules.
-- Expand automated UI tests and accessibility coverage.
-- Add pagination for large enrollment and payment datasets (demo datasets fit current queries).
-- Add CI security scanning and dependency updates.
-
-## Supabase security advisor
-
-The security advisor found no exposed-table or function security findings. Leaked-password protection is disabled; review [Supabase password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection) before accepting real users. Demo passwords are independently generated random values.
+- Generate database TypeScript types and further split the first-release app module.
+- Add automated database cleanup fixtures for management integration tests.
+- Expand accessibility, concurrent-edit and session-expiry coverage.
+- Add dependency/security scanning to CI.

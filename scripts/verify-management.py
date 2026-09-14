@@ -1,0 +1,67 @@
+from pathlib import Path
+import json,time,uuid
+exec(Path('scripts/verify-access.py').read_text(encoding='utf-8').split('admin=login')[0])
+run='qa-'+str(int(time.time()))
+created={'run':run,'users':[],'classes':[],'assignments':[],'messages':[]}
+def save():Path('.local/qa-management.json').write_text(json.dumps(created),encoding='utf-8')
+def edge(token,body):
+ return request('/functions/v1/web-manage-accounts',token,'POST',body)
+def add(table,token,body):
+ status,data=request('/rest/v1/'+table,token,'POST',body)
+ check(status==201,'Create '+table)
+ return data[0]
+admin=login(accounts[0]);local=login(accounts[2]);student=login(accounts[3]);second=login(accounts[4])
+school=ids['schools'][0]['id'];other=ids['schools'][1]['id'];first_id=ids['students'][0]['id'];second_id=ids['students'][1]['id']
+try:
+ for t in [student,local]:
+  status,_=edge(t,{'action':'create_subadmin','school_ids':[school],'name':'QA staff','email':run+'-forbidden@suiviscolaire.example'})
+  check(status==403,'Only main admin may create sub-admins')
+ status,_=edge(student,{'action':'archive_student','student_id':first_id,'archived':True});check(status==403,'Student cannot archive another account')
+ status,_=edge(None,{'action':'create_student'});check(status==401,'Account endpoint requires a verified login')
+ status,_=request('/rest/v1/web_classes',local,'POST',{'school_id':other,'name':run});check(status in [401,403],'Sub-admin cannot create a class in another school')
+ cl=add('web_classes',local,{'school_id':school,'name':run});created['classes'].append(cl['id']);save()
+ status,u=edge(local,{'action':'create_student','school_ids':[school],'name':'QA Student','email':run+'-student@suiviscolaire.example','matricule':run,'class_name':run,'sex':'F','birth_date':'2018-01-15'})
+ check(status==200,'Sub-admin creates student and login')
+ created['users'].append(u);save()
+ newtoken=login({'email':u['email'],'password':u['password'],'role':'new student'})
+ newstudent=rows('web_students',newtoken)[0]
+ check(newstudent['class_name']==run,'New account linked to correct class')
+ status,u=edge(admin,{'action':'create_subadmin','school_ids':[school,other],'name':'QA Subadmin','email':run+'-staff@suiviscolaire.example'})
+ check(status==200,'Main admin creates multi-school sub-admin');created['users'].append(u);save()
+ stafftoken=login({'email':u['email'],'password':u['password'],'role':'new subadmin'})
+ check(len(rows('web_schools',stafftoken))==2,'Created sub-admin sees assigned schools only')
+ subject=rows('web_subjects',local,'&school_id=eq.'+school)[0]
+ a=add('web_assignments',local,{'school_id':school,'subject_id':subject['id'],'class_name':'1ère primaire','title':run,'kind':'interrogation','term':1,'period':1,'max_score':20,'due_date':'2026-09-14','published':False})
+ created['assignments'].append(a['id']);save()
+ status,count=request('/rest/v1/rpc/web_import_marks',local,'POST',{'assignment':a['id'],'entries':[{'student_id':first_id,'score':16},{'student_id':second_id,'score':14}]})
+ check(status==200 and count==2,'Bulk mark import succeeds atomically')
+ status,_=request('/rest/v1/rpc/web_import_marks',local,'POST',{'assignment':a['id'],'entries':[{'student_id':first_id,'score':18},{'student_id':second_id,'score':99}]})
+ check(status==400,'Invalid batch is rejected')
+ stored=rows('web_marks',local,'&assignment_id=eq.'+a['id'])
+ check(next(m['score'] for m in stored if m['student_id']==first_id)==16,'Invalid batch rolls back earlier rows')
+ check(not rows('web_assignments',student,'&id=eq.'+a['id']),'Students cannot see draft evaluations')
+ status,_=request('/rest/v1/rpc/web_import_marks',student,'POST',{'assignment':a['id'],'entries':[{'student_id':first_id,'score':20}]});check(status in [400,403],'Student cannot import marks')
+ status,_=request('/rest/v1/web_assignments?id=eq.'+a['id'],local,'PATCH',{'published':True});check(status==200,'Publish evaluation')
+ check(len(rows('web_marks',student,'&assignment_id=eq.'+a['id']))==1,'Published marks visible only to their student')
+ check(any(run in n['title'] for n in rows('web_notifications',student)),'Publication creates personal notification')
+ status,_=request('/rest/v1/rpc/web_import_marks',local,'POST',{'assignment':a['id'],'entries':[{'student_id':first_id,'score':20}]});check(status==400,'Published evaluation must be hidden before import')
+ personal=add('web_messages',local,{'school_id':school,'title':run+' personal','body':'QA only','audience':'student','student_id':first_id});created['messages'].append(personal['id']);save()
+ classroom=add('web_messages',local,{'school_id':school,'title':run+' class','body':'QA only','audience':'class','class_name':'1ère primaire'});created['messages'].append(classroom['id']);save()
+ check(len(rows('web_messages',student,'&id=eq.'+personal['id']))==1,'Individual message reaches intended student')
+ check(not rows('web_messages',second,'&id=eq.'+personal['id']),'Individual message hidden from classmates')
+ check(not rows('web_messages',newtoken,'&id=eq.'+classroom['id']),'Class message hidden from another class')
+ check(len(rows('web_messages',second,'&id=eq.'+classroom['id']))==1,'Class message reaches classmates')
+ notification=next(n for n in rows('web_notifications',student) if n['id']=='message:'+personal['id'])
+ status,_=request('/rest/v1/web_notification_reads',student,'POST',{'notification_id':notification['id']})
+ check(status==201,'Student marks own notification as read')
+ status,_=request('/rest/v1/web_notification_reads',student,'POST',{'user_id':accounts[4]['id'],'notification_id':notification['id']})
+ check(status in [401,403],'Student cannot change another account notification')
+ status,_=edge(local,{'action':'archive_student','student_id':newstudent['id'],'archived':True});check(status==200,'Sub-admin archives student')
+ check(not rows('web_schools',newtoken),'Archived student immediately loses school access')
+ status,_=edge(local,{'action':'archive_student','student_id':newstudent['id'],'archived':False});check(status==200,'Sub-admin restores student')
+ check(len(rows('web_schools',newtoken))==1,'Restored student regains school access')
+ for t in [newtoken,stafftoken]:request('/auth/v1/logout',t,'POST')
+ print(str(checks)+' management integration checks passed.')
+finally:
+ for t in [admin,local,student,second]:request('/auth/v1/logout',t,'POST')
+ save()
