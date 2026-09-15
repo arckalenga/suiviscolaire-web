@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Printer,
+  Download,
   Check,
   School,
   ChevronRight,
@@ -29,6 +30,8 @@ import {
 import { db } from "./client";
 import "./style.css";
 import "./acadexis.css";
+import "./refinements.css";
+import { slug } from "../supabase/functions/web-manage-accounts/student-access.ts";
 import { Landing } from "./Landing";
 import {
   MainControls,
@@ -100,6 +103,7 @@ function App() {
   const [publicPage, setPublicPage] = useState(
     window.location.hash === "#connexion" ? "login" : "home",
   );
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [reads, setReads] = useState<string[]>([]);
   useEffect(() => {
     const change = () =>
@@ -722,9 +726,46 @@ function App() {
                         <StudentPicker />
                         <button
                           className="button"
+                          disabled={!student || pdfBusy}
+                          onClick={async () => {
+                            const report =
+                              document.querySelector<HTMLElement>(".bulletin");
+                            if (!report || !student) return;
+                            const snapshot = report.cloneNode(
+                              true,
+                            ) as HTMLElement;
+                            const filename =
+                              (
+                                "bulletin-" +
+                                student.name +
+                                "-" +
+                                selected.academic_year
+                              ).replace(/[^a-zA-Z0-9À-ÿ._-]/g, "-") + ".pdf";
+                            setPdfBusy(true);
+                            try {
+                              const { downloadBulletinPdf } =
+                                await import("./bulletin-pdf");
+                              await downloadBulletinPdf(snapshot, filename);
+                            } catch {
+                              setError(
+                                "Le téléchargement du bulletin a échoué. Réessayez ou utilisez Imprimer.",
+                              );
+                            } finally {
+                              setPdfBusy(false);
+                            }
+                          }}
+                        >
+                          <Download size={17} />{" "}
+                          {pdfBusy
+                            ? "Préparation du PDF…"
+                            : "Télécharger le PDF"}
+                        </button>
+                        <button
+                          className="button secondary"
+                          disabled={!student}
                           onClick={() => window.print()}
                         >
-                          <Printer size={17} /> Imprimer / PDF
+                          <Printer size={17} /> Imprimer
                         </button>
                       </div>
                       {student ? (
@@ -946,6 +987,11 @@ function App() {
                               name: f.name,
                               city: f.city,
                               currency: f.currency,
+                              student_email_domain: String(
+                                f.student_email_domain,
+                              )
+                                .trim()
+                                .toLowerCase(),
                               terms: Number(f.terms),
                               periods_per_term: Number(f.periods_per_term),
                             };
@@ -977,6 +1023,23 @@ function App() {
                             name="city"
                             value={selected.city}
                           />
+                          <label>
+                            Domaine des identifiants élèves
+                            <input
+                              name="student_email_domain"
+                              required
+                              maxLength={190}
+                              defaultValue={
+                                selected.student_email_domain ||
+                                (slug(selected.name) || "ecole") + ".com"
+                              }
+                              placeholder="csfleuve.com"
+                            />
+                            <small className="field-help">
+                              Exemple : kalenga@csfleuve.com. S’applique aux
+                              nouveaux comptes. Aucune boîte e-mail n’est créée.
+                            </small>
+                          </label>
                           <label>
                             Devise par défaut
                             <select

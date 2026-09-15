@@ -1,3 +1,4 @@
+import { studentEmail, studentPassword, slug } from "./student-access.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 const allowed = new Set([
   "https://arckalenga.github.io",
@@ -89,10 +90,26 @@ Deno.serve(async (req) => {
         return respond({ error: "Administrateur principal requis." }, 403);
     } else if (schoolIds.length !== 1 || !(await canManage(schoolIds[0])))
       return respond({ error: "Accès refusé." }, 403);
-    const name = String(b.name || "").trim(),
-      email = String(b.email || "")
-        .trim()
-        .toLowerCase();
+    const name = String(b.name || "").trim();
+    let email = String(b.email || "")
+      .trim()
+      .toLowerCase();
+    if (role === "student") {
+      const { data: school } = await admin
+        .from("web_schools")
+        .select("name,student_email_domain")
+        .eq("id", schoolIds[0])
+        .single();
+      if (!school) return respond({ error: "Établissement introuvable." }, 400);
+      const domain =
+        school.student_email_domain || (slug(school.name) || "ecole") + ".com";
+      if (!email) email = studentEmail(name, domain);
+      if (email.split("@")[1] !== domain)
+        return respond(
+          { error: "Utilisez une adresse de connexion @" + domain + "." },
+          400,
+        );
+    }
     if (
       name.length < 2 ||
       name.length > 150 ||
@@ -116,10 +133,12 @@ Deno.serve(async (req) => {
       if (b.birth_date && !/^\d{4}-\d{2}-\d{2}$/.test(b.birth_date))
         return respond({ error: "Date attendue au format AAAA-MM-JJ." }, 400);
     }
-    const password = Array.from(
-      crypto.getRandomValues(new Uint8Array(18)),
-      (x) => x.toString(16).padStart(2, "0"),
-    ).join("");
+    const password =
+      role === "student"
+        ? studentPassword()
+        : Array.from(crypto.getRandomValues(new Uint8Array(18)), (x) =>
+            x.toString(16).padStart(2, "0"),
+          ).join("");
     const { data: created, error: createError } =
       await admin.auth.admin.createUser({
         email,

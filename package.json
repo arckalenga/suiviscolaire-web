@@ -9,10 +9,13 @@
     "test": "node scripts/test-browser.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test:browser": "node scripts/test-browser.mjs",
-    "test:imports": "node --test tests/imports.test.mjs"
+    "test:imports": "node --test tests/imports.test.mjs",
+    "test:unit": "node --test tests/imports.test.mjs tests/student-access.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",
+    "jspdf": "4.2.1",
+    "jspdf-autotable": "5.0.8",
     "lucide-react": "0.577.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

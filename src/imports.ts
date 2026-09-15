@@ -1,3 +1,4 @@
+import { studentEmail } from "../supabase/functions/web-manage-accounts/student-access.ts";
 export type SheetRow = Record<string, string>;
 const normalize = (s: string) =>
   s
@@ -63,12 +64,19 @@ export function validateStudents(
   rows: SheetRow[],
   classes: string[],
   existing: { matricule: string; email?: string }[],
+  domain?: string,
 ) {
   const matricules = new Set(existing.map((s) => s.matricule.toLowerCase())),
     emails = new Set(
       existing.map((s) => s.email?.toLowerCase()).filter(Boolean),
     );
-  return rows.map((r, i) => {
+  return rows.map((raw, i) => {
+    const r: SheetRow = {
+      ...raw,
+      email:
+        raw.email?.trim().toLowerCase() ||
+        (domain ? studentEmail(raw.nom || "", domain) : ""),
+    };
     const errors: string[] = [];
     if (!r.nom || r.nom.length < 2) errors.push("Nom requis");
     if (!r.matricule || r.matricule.length > 60)
@@ -77,6 +85,8 @@ export function validateStudents(
       errors.push("Matricule déjà utilisé");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email || ""))
       errors.push("Email invalide");
+    if (domain && r.email.split("@")[1] !== domain)
+      errors.push("Utilisez @" + domain);
     if (emails.has(r.email?.toLowerCase())) errors.push("Email déjà utilisé");
     if (!classes.includes(r.classe)) errors.push("Classe inconnue");
     if (r.sexe && !["M", "F"].includes(r.sexe)) errors.push("Sexe : M ou F");

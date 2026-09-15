@@ -1,3 +1,7 @@
+import {
+  studentEmail,
+  slug,
+} from "../supabase/functions/web-manage-accounts/student-access.ts";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Plus,
@@ -231,14 +235,12 @@ export function MainControls({
             label="Créer l’école"
             submit={async (f) => {
               await checked(
-                db
-                  .from("web_schools")
-                  .insert({
-                    name: f.name,
-                    city: f.city,
-                    currency: f.currency,
-                    academic_year: f.academic_year,
-                  }),
+                db.from("web_schools").insert({
+                  name: f.name,
+                  city: f.city,
+                  currency: f.currency,
+                  academic_year: f.academic_year,
+                }),
               );
               await refresh();
             }}
@@ -385,6 +387,46 @@ export function StudentActions({
     </div>
   );
 }
+function StudentLoginFields({ domain }: { domain: string }) {
+  const [name, setName] = useState(""),
+    [email, setEmail] = useState(""),
+    [manual, setManual] = useState(false);
+  return (
+    <>
+      <label>
+        Nom complet
+        <input
+          name="name"
+          required
+          maxLength={150}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (!manual) setEmail(studentEmail(e.target.value, domain));
+          }}
+        />
+      </label>
+      <label>
+        Email de connexion
+        <input
+          aria-label="Email de connexion"
+          name="email"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setManual(true);
+          }}
+        />
+        <small className="field-help">
+          Identifiant @{domain}. En cas d’homonyme, ajoutez le matricule avant
+          @. Mot de passe généré : 6 caractères.
+        </small>
+      </label>
+    </>
+  );
+}
 export function StudentsManager({
   school,
   students,
@@ -407,6 +449,8 @@ export function StudentsManager({
     [busy, setBusy] = useState(false),
     [includeArchived, setIncludeArchived] = useState(false);
   const names = classes.map((c) => c.name);
+  const domain =
+    school.student_email_domain || (slug(school.name) || "ecole") + ".com";
   async function create(f: Row) {
     const r = await account({
       action: "create_student",
@@ -436,9 +480,8 @@ export function StudentsManager({
                 await refresh();
               }}
             >
-              <Input label="Nom complet" name="name" />
+              <StudentLoginFields key={school.id + domain} domain={domain} />
               <Input label="Matricule" name="matricule" maxLength={60} />
-              <Input label="Email de connexion" name="email" type="email" />
               <Select label="Classe" name="class_name" items={names} />
               <Select label="Sexe" name="sex" items={["F", "M"]} />
               <Input
@@ -455,8 +498,9 @@ export function StudentsManager({
         <section className="panel">
           <h3>Importer des élèves depuis Excel</h3>
           <p className="muted">
-            Colonnes : Matricule, Nom, Classe, Email, Sexe, Naissance. Créez
-            d’abord les classes. Un accès est généré pour chaque nouvel élève.
+            Colonnes : Matricule, Nom, Classe, Email (facultatif), Sexe,
+            Naissance. Sans email, un identifiant @{domain} est proposé. Un mot
+            de passe de 6 caractères est généré par élève.
           </p>
           <button
             className="button secondary"
@@ -466,7 +510,7 @@ export function StudentsManager({
                   Matricule: "EL-001",
                   Nom: "Nom de l’élève",
                   Classe: names[0] || "1ère primaire",
-                  Email: "eleve@exemple.com",
+                  Email: studentEmail("Nom Eleve", domain),
                   Sexe: "F",
                   Naissance: "2018-01-15",
                 },
@@ -493,6 +537,7 @@ export function StudentsManager({
                       await readWorkbook(file),
                       names,
                       students as any,
+                      domain,
                     ),
                   );
                 } catch (err) {
@@ -763,16 +808,14 @@ export function ClassManager({
             title="Ajouter une branche / un cours"
             submit={async (f) => {
               await checked(
-                db
-                  .from("web_subjects")
-                  .insert({
-                    school_id: school.id,
-                    name: f.name,
-                    domain: f.domain,
-                    period_max: Number(f.period_max),
-                    exam_max: Number(f.exam_max),
-                    sort_order: subjects.length,
-                  }),
+                db.from("web_subjects").insert({
+                  school_id: school.id,
+                  name: f.name,
+                  domain: f.domain,
+                  period_max: Number(f.period_max),
+                  exam_max: Number(f.exam_max),
+                  sort_order: subjects.length,
+                }),
               );
               await refresh();
             }}
@@ -847,16 +890,14 @@ export function CommunicationsManager({
         label="Publier la communication"
         submit={async (f) => {
           await checked(
-            db
-              .from("web_messages")
-              .insert({
-                school_id: school.id,
-                title: f.title,
-                body: f.body,
-                audience,
-                class_name: audience === "class" ? f.class_name : null,
-                student_id: audience === "student" ? f.student_id : null,
-              }),
+            db.from("web_messages").insert({
+              school_id: school.id,
+              title: f.title,
+              body: f.body,
+              audience,
+              class_name: audience === "class" ? f.class_name : null,
+              student_id: audience === "student" ? f.student_id : null,
+            }),
           );
           await refresh();
         }}

@@ -88,3 +88,15 @@ Private demonstration credentials live in .local/DEMO_CREDENTIALS.md and .local/
 The workflow publishes codex/main to GitHub Pages. VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are public repository build variables.
 
 See NEXT_STEPS.md for the remaining production work.
+
+## Student logins and PDF downloads
+
+New student accounts receive exactly six random characters (uppercase letters and digits without ambiguous I/O/0/1). Existing passwords and login addresses remain valid; no bulk reset is performed. This short-password policy is a demonstration choice requested by the owner; longer passwords are recommended for real student data.
+
+School Settings includes a login domain (for example csfleuve.com). New-student forms suggest name@schooldomain, and Excel imports generate it when Email is blank. Duplicate names require a distinct local part, such as a matricule suffix. The domain applies only to new accounts; these identifiers do not provision mailboxes or establish domain ownership. Real email delivery requires a school-controlled domain and mail configuration.
+
+Every role can use Bulletins > Télécharger le PDF. Administrators first select an authorized school and student; students export their own bulletin. The direct PDF includes published marks, missing-evaluation indicators and selectable text. Print remains available separately. Standard three-term reports use portrait A4; wider configurations use landscape A4 with repeated table headings across pages.
+
+Verification: npm run test:imports, node --test tests/student-access.test.mjs, node scripts/test-bulletin-download.mjs. The last test uses private demo credentials in .local/accounts.json and saves local PDF and screenshot samples under .local/pdf-checks/.
+
+Apply database/student-access.sql after schema.sql and acadexis-management.sql when setting up a fresh dedicated project. The deployed web-manage-accounts function must include student-access.ts beside index.ts.
