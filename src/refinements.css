@@ -172,3 +172,21 @@
     }
   }
 }
+
+/* Teal complements the blue navigation without adding visual noise. */
+@media screen {
+  :root { --accent: #147d78; --accent-soft: #eaf6f3; }
+  .public-hero em, .hero-trust svg, .floating-message > svg,
+  .contact-links a > svg:first-child { color: var(--accent); }
+  .public-values .value-icon, .student-action:nth-child(even) > span {
+    color: var(--accent); background: var(--accent-soft);
+  }
+  .student-action:nth-child(odd) > span { color: var(--blue); background: #edf2ff; }
+  .public-contact { background: var(--accent-soft); }
+  .public-contact .eyebrow { color: var(--accent); }
+  .green-dot, .demo-label > span { background: var(--accent); }
+  .welcome { border-left: 3px solid var(--accent); }
+  .school-card:hover, .student-action:hover { border-color: var(--accent); }
+  .stat:nth-child(2) .stat-icon { color: var(--accent); background: var(--accent-soft); }
+  .login-features svg { color: #9bd8cd; }
+}
