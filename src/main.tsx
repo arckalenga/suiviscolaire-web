@@ -1,3 +1,5 @@
+import { Personnel } from "./Personnel";
+import { ReceiptActions } from "./ReceiptActions";
 import { Bulletin } from "./Bulletin";
 import {
   useEffect,
@@ -86,6 +88,7 @@ const nav = [
   ["timetable", "Emploi du temps", CalendarDays],
   ["notifications", "Notifications", Bell],
   ["online", "Payer en ligne", CreditCard],
+  ["personnel", "Personnel & salaires", Users],
   ["settings", "Paramètres", Settings],
 ] as const;
 function App() {
@@ -105,6 +108,32 @@ function App() {
     window.location.hash === "#connexion" ? "login" : "home",
   );
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [bulletinAccess, setBulletinAccess] = useState<{
+    id: string;
+    allowed: boolean;
+  } | null>(null);
+  useEffect(() => {
+    let current = true;
+    setBulletinAccess(null);
+    if (tab === "bulletin" && studentId) {
+      void db
+        .from("web_students")
+        .select("bulletin_blocked")
+        .eq("id", studentId)
+        .single()
+        .then((r) => {
+          if (current)
+            setBulletinAccess({
+              id: studentId,
+              allowed: !r.error && !r.data?.bulletin_blocked,
+            });
+        });
+    }
+    return () => {
+      current = false;
+    };
+  }, [tab, studentId, session?.user.id]);
+
   const [reads, setReads] = useState<string[]>([]);
   useEffect(() => {
     const change = () =>
@@ -139,6 +168,7 @@ function App() {
         setData(empty);
         setReads([]);
         setTab("overview");
+        setStudentId("");
         setMain(false);
       }
     });
@@ -162,6 +192,14 @@ function App() {
       setError("Impossible de charger les établissements. Réessayez.");
     else {
       setSchools(s.data || []);
+      if (
+        selectedScope.current &&
+        !s.data?.some((x) => x.id === selectedScope.current)
+      ) {
+        requestId.current++;
+        setSelected(null);
+        setData(empty);
+      }
       setMembers(m.data || []);
       setMain(!!a.data?.length);
       if (
@@ -179,6 +217,36 @@ function App() {
       requestId.current++;
     };
   }, [selected?.id]);
+  useEffect(() => {
+    if (!session) return;
+    const check = async () => {
+      const r = await db
+        .from("web_memberships")
+        .select("*")
+        .eq("user_id", session.user.id);
+      if (r.error) return;
+      setMembers(r.data || []);
+      if (
+        !main &&
+        selected &&
+        !r.data?.some((m) => m.school_id === selected.id && m.active)
+      ) {
+        requestId.current++;
+        setSelected(null);
+        setData(empty);
+        setSchools([]);
+        void loadSchools();
+        return;
+      }
+      if (selected && !manager) void loadData(true);
+    };
+    const timer = setInterval(() => void check(), 15000);
+    window.addEventListener("focus", check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", check);
+    };
+  }, [session?.user.id, selected?.id, main, manager]);
   async function loadData(refresh = false) {
     if (!selected || selectedScope.current !== selected.id) return;
     const currentRequest = ++requestId.current;
@@ -357,7 +425,10 @@ function App() {
             nav
               .filter(
                 ([id]) =>
-                  manager || !["students", "classes", "settings"].includes(id),
+                  manager ||
+                  !["students", "classes", "settings", "personnel"].includes(
+                    id,
+                  ),
               )
               .map(([id, label, Icon]) => (
                 <button
@@ -520,6 +591,14 @@ function App() {
                 <>
                   {tab === "overview" && (
                     <>
+                      {manager && (
+                        <button
+                          className="button secondary"
+                          onClick={() => go("personnel")}
+                        >
+                          Personnel et paiements des enseignants / travailleurs
+                        </button>
+                      )}
                       {!manager && (
                         <StudentActions
                           go={go}
@@ -721,65 +800,120 @@ function App() {
                     />
                   )}
                   {tab === "online" && <OnlinePayment />}
-                  {tab === "bulletin" && (
-                    <>
-                      <div className="toolbar no-print">
-                        <StudentPicker />
-                        <button
-                          className="button"
-                          disabled={!student || pdfBusy}
-                          onClick={async () => {
-                            const report =
-                              document.querySelector<HTMLElement>(".bulletin");
-                            if (!report || !student) return;
-                            const snapshot = report.cloneNode(
-                              true,
-                            ) as HTMLElement;
-                            const filename =
-                              (
-                                "bulletin-" +
-                                student.name +
-                                "-" +
-                                selected.academic_year
-                              ).replace(/[^a-zA-Z0-9À-ÿ._-]/g, "-") + ".pdf";
-                            setPdfBusy(true);
-                            try {
-                              const { downloadBulletinPdf } =
-                                await import("./bulletin-pdf");
-                              await downloadBulletinPdf(snapshot, filename);
-                            } catch {
-                              setError(
-                                "Le téléchargement du bulletin a échoué. Réessayez ou utilisez Imprimer.",
-                              );
-                            } finally {
-                              setPdfBusy(false);
-                            }
-                          }}
-                        >
-                          <Download size={17} />{" "}
-                          {pdfBusy
-                            ? "Préparation du PDF…"
-                            : "Télécharger le PDF"}
-                        </button>
-                        <button
-                          className="button secondary"
-                          disabled={!student}
-                          onClick={() => window.print()}
-                        >
-                          <Printer size={17} /> Imprimer
-                        </button>
-                      </div>
-                      {student ? (
-                        <Bulletin
-                          school={selected}
-                          student={student}
-                          data={data}
-                        />
-                      ) : (
-                        <Empty text="Aucun élève disponible." />
-                      )}
-                    </>
+                  {tab === "personnel" && manager && (
+                    <Personnel
+                      key={selected.id}
+                      school={selected}
+                      subjects={data.subjects}
+                    />
                   )}
+                  {tab === "bulletin" &&
+                    !manager &&
+                    (student?.bulletin_blocked ||
+                      (bulletinAccess?.id === studentId &&
+                        !bulletinAccess.allowed)) && (
+                      <section className="panel">
+                        <h2>Bulletin temporairement indisponible</h2>
+                        <p>
+                          Contactez l’administration de votre école. Vos notes
+                          et les autres rubriques restent accessibles.
+                        </p>
+                      </section>
+                    )}
+                  {tab === "bulletin" &&
+                    (manager ||
+                      (bulletinAccess?.id === studentId &&
+                        bulletinAccess.allowed &&
+                        !student?.bulletin_blocked)) && (
+                      <>
+                        <div className="toolbar no-print">
+                          <StudentPicker />
+                          <button
+                            className="button"
+                            disabled={!student || pdfBusy}
+                            onClick={async () => {
+                              const report =
+                                document.querySelector<HTMLElement>(
+                                  ".bulletin",
+                                );
+                              if (!report || !student) return;
+                              const access = await db
+                                .from("web_students")
+                                .select("bulletin_blocked")
+                                .eq("id", student.id)
+                                .single();
+                              if (
+                                access.error ||
+                                (!manager && access.data?.bulletin_blocked)
+                              ) {
+                                setError("Accès au bulletin indisponible.");
+                                void loadData(true);
+                                return;
+                              }
+                              const snapshot = report.cloneNode(
+                                true,
+                              ) as HTMLElement;
+                              const filename =
+                                (
+                                  "bulletin-" +
+                                  student.name +
+                                  "-" +
+                                  selected.academic_year
+                                ).replace(/[^a-zA-Z0-9À-ÿ._-]/g, "-") + ".pdf";
+                              setPdfBusy(true);
+                              try {
+                                const { downloadBulletinPdf } =
+                                  await import("./bulletin-pdf");
+                                await downloadBulletinPdf(snapshot, filename);
+                              } catch {
+                                setError(
+                                  "Le téléchargement du bulletin a échoué. Réessayez ou utilisez Imprimer.",
+                                );
+                              } finally {
+                                setPdfBusy(false);
+                              }
+                            }}
+                          >
+                            <Download size={17} />{" "}
+                            {pdfBusy
+                              ? "Préparation du PDF…"
+                              : "Télécharger le PDF"}
+                          </button>
+                          <button
+                            className="button secondary"
+                            disabled={!student}
+                            onClick={async () => {
+                              if (!student) return;
+                              const access = await db
+                                .from("web_students")
+                                .select("bulletin_blocked")
+                                .eq("id", student.id)
+                                .single();
+                              if (
+                                access.error ||
+                                (!manager && access.data?.bulletin_blocked)
+                              ) {
+                                setError("Accès au bulletin indisponible.");
+                                void loadData(true);
+                                return;
+                              }
+                              window.print();
+                            }}
+                          >
+                            <Printer size={17} /> Imprimer
+                          </button>
+                        </div>
+                        {student ? (
+                          <Bulletin
+                            school={selected}
+                            student={student}
+                            data={data}
+                          />
+                        ) : (
+                          <Empty text="Aucun élève disponible." />
+                        )}
+                      </>
+                    )}
                   {tab === "payments" && (
                     <>
                       <StudentPicker />
@@ -839,7 +973,13 @@ function App() {
                           ligne n’est pas encore activé.
                         </p>
                         <Table
-                          headers={["Date", "Libellé", "Référence", "Montant"]}
+                          headers={[
+                            "Date",
+                            "Libellé",
+                            "Référence",
+                            "Montant",
+                            "Reçu",
+                          ]}
                         >
                           {data.payments
                             .filter((p) => p.student_id === studentId)
@@ -851,6 +991,15 @@ function App() {
                                 <td>{p.reference}</td>
                                 <td>
                                   <strong>{money(p.amount, p.currency)}</strong>
+                                </td>
+                                <td>
+                                  {student && (
+                                    <ReceiptActions
+                                      payment={p}
+                                      school={selected}
+                                      student={student}
+                                    />
+                                  )}
                                 </td>
                               </tr>
                             ))}

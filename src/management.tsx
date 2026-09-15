@@ -25,7 +25,7 @@ import {
 } from "./imports";
 type Row = Record<string, any>;
 type Refresh = () => Promise<void>;
-async function checked(q: any) {
+export async function checked(q: any) {
   const r = await q;
   if (r.error)
     throw Error(
@@ -65,7 +65,7 @@ function Feedback({ error, notice }: { error: string; notice?: string }) {
     </>
   );
 }
-function Input({
+export function Input({
   label,
   name,
   value = "",
@@ -86,7 +86,7 @@ function Input({
     </label>
   );
 }
-function Select({ label, name, items, value, onChange }: any) {
+export function Select({ label, name, items, value, onChange }: any) {
   return (
     <label>
       {label}
@@ -103,7 +103,7 @@ function Select({ label, name, items, value, onChange }: any) {
     </label>
   );
 }
-function ActionForm({
+export function ActionForm({
   title,
   children,
   submit,
@@ -211,7 +211,9 @@ export function MainControls({
   const [credentials, setCredentials] = useState<Row[]>([]),
     [staff, setStaff] = useState<Row[]>([]),
     [members, setMembers] = useState<Row[]>([]),
-    [chosen, setChosen] = useState<string[]>([]);
+    [chosen, setChosen] = useState<string[]>([]),
+    [staffError, setStaffError] = useState(""),
+    [staffBusy, setStaffBusy] = useState(false);
   async function load() {
     const [s, m] = await Promise.all([
       db.from("web_staff").select("*"),
@@ -299,15 +301,17 @@ export function MainControls({
         </details>
       </div>
       <Credentials rows={credentials} />
-      <details className="panel form-panel">
-        <summary>Voir les sous-administrateurs ({staff.length})</summary>
+      <details open className="panel form-panel">
+        <summary>Gérer les sous-administrateurs ({staff.length})</summary>
+        <Feedback error={staffError} />
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
                 <th>Nom</th>
                 <th>Email</th>
-                <th>Écoles autorisées</th>
+                <th>Écoles attribuées</th>
+                <th>Accès</th>
               </tr>
             </thead>
             <tbody>
@@ -317,11 +321,40 @@ export function MainControls({
                   <td>{s.email}</td>
                   <td>
                     {members
-                      .filter((m) => m.user_id === s.user_id && m.active)
+                      .filter((m) => m.user_id === s.user_id)
                       .map(
                         (m) => schools.find((s) => s.id === m.school_id)?.name,
                       )
                       .join(", ")}
+                  </td>
+                  <td>
+                    <button
+                      className="button secondary"
+                      disabled={staffBusy}
+                      onClick={async () => {
+                        setStaffBusy(true);
+                        setStaffError("");
+                        try {
+                          await checked(
+                            db.rpc("web_set_subadmin_active", {
+                              target: s.user_id,
+                              enabled: !members.some(
+                                (m) => m.user_id === s.user_id && m.active,
+                              ),
+                            }),
+                          );
+                          await load();
+                        } catch {
+                          setStaffError("Modification des accès refusée.");
+                        } finally {
+                          setStaffBusy(false);
+                        }
+                      }}
+                    >
+                      {members.some((m) => m.user_id === s.user_id && m.active)
+                        ? "Désactiver"
+                        : "Réactiver"}
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -722,6 +755,37 @@ export function StudentsManager({
                       <div className="row-actions">
                         <button onClick={() => view(s.id)}>Résultats</button>
                         <button onClick={() => setEditing(s)}>Modifier</button>
+                        <button
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            setError("");
+                            try {
+                              const rows = await checked(
+                                db
+                                  .from("web_students")
+                                  .update({
+                                    bulletin_blocked: !s.bulletin_blocked,
+                                  })
+                                  .eq("id", s.id)
+                                  .eq("school_id", school.id)
+                                  .select(),
+                              );
+                              if (!rows.length) throw Error();
+                              await refresh();
+                            } catch {
+                              setError(
+                                "Modification de l’accès au bulletin refusée.",
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          {s.bulletin_blocked
+                            ? "Autoriser le bulletin"
+                            : "Bloquer le bulletin"}
+                        </button>
                         <button
                           disabled={busy}
                           onClick={async () => {

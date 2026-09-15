@@ -15,8 +15,8 @@
 ## Further school management
 
 - Add multi-year enrollments and a guided class transition for students already graded.
-- Add teacher roles, per-course assignments, attendance, absences, rankings and promotion decisions.
-- Add fee schedules, invoices, outstanding balances and downloadable receipts.
+- Add teacher login roles, attendance, absences, rankings and promotion decisions. Teacher records and subject assignments are implemented.
+- Add fee schedules, invoices and outstanding balances. Downloadable/printable receipts and manual sharing are implemented.
 - Add editing/removing timetable slots and overlap validation.
 - Add replies and external notification delivery. Current communications and notifications are in-app.
 - Add editing an existing sub-admin's school assignments and administrator-driven account recovery.
@@ -37,3 +37,9 @@
 - Add automated database cleanup fixtures for management integration tests.
 - Expand accessibility, concurrent-edit and session-expiry coverage.
 - Add dependency/security scanning to CI.
+
+## Personnel and receipts
+
+- Add payroll period filters, editing/correction workflows and pagination for very large staff histories. Current records track payments already made, not salary calculation or transfers.
+- Receipt sharing uses the device share sheet when supported; otherwise download and attach the PDF manually through email/WhatsApp. Automated delivery and delivery tracking need a configured provider.
+- Bulletin restrictions hide the in-app report and block its normal PDF/print controls; marks intentionally remain readable. They cannot revoke previously downloaded copies or prevent reconstruction from visible marks. Add server-issued signed report snapshots if document authenticity is required.

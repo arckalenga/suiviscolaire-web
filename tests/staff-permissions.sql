@@ -1,0 +1,30 @@
+begin;
+select set_config('qa.admin',(select user_id::text from public.web_admins limit 1),true);
+select set_config('qa.sub',(select user_id::text from public.web_staff where email='fleuve@suiviscolaire.example'),true);
+select set_config('qa.student',(select user_id::text from public.web_students where not archived limit 1),true);
+select set_config('qa.school',(select school_id::text from public.web_students where user_id=current_setting('qa.student')::uuid),true);
+set local role authenticated;
+select set_config('request.jwt.claims',json_build_object('sub',current_setting('qa.admin'),'role','authenticated')::text,true);
+select public.web_set_subadmin_active(current_setting('qa.sub')::uuid,false);
+select set_config('request.jwt.claims',json_build_object('sub',current_setting('qa.sub'),'role','authenticated')::text,true);
+do $$ begin if public.web_manage(current_setting('qa.school')::uuid) then raise exception 'Deactivation failed';end if;end $$;
+select set_config('request.jwt.claims',json_build_object('sub',current_setting('qa.admin'),'role','authenticated')::text,true);
+select public.web_set_subadmin_active(current_setting('qa.sub')::uuid,true);
+select set_config('request.jwt.claims',json_build_object('sub',current_setting('qa.sub'),'role','authenticated')::text,true);
+do $$ declare wid uuid; begin
+ if not public.web_manage(current_setting('qa.school')::uuid) then raise exception 'Reactivation failed';end if;
+ insert into public.web_workers(school_id,name,kind) values(current_setting('qa.school')::uuid,'QA rollback teacher','teacher') returning id into wid;
+ insert into public.web_teacher_subjects(school_id,worker_id,subject_id) select current_setting('qa.school')::uuid,wid,id from public.web_subjects where school_id=current_setting('qa.school')::uuid limit 1;
+ insert into public.web_staff_payments(school_id,worker_id,label,amount,currency,paid_on,reference) values(current_setting('qa.school')::uuid,wid,'QA rollback',15,'USD',current_date,'QA');
+ update public.web_students set bulletin_blocked=true where user_id=current_setting('qa.student')::uuid;
+ begin perform public.web_set_subadmin_active(current_setting('qa.sub')::uuid,false);raise exception 'Unexpected admin access';exception when raise_exception then if sqlerrm='Unexpected admin access' then raise;end if;end;
+end $$;
+select set_config('request.jwt.claims',json_build_object('sub',current_setting('qa.student'),'role','authenticated')::text,true);
+do $$ begin
+ if exists(select 1 from public.web_workers) or exists(select 1 from public.web_staff_payments) or exists(select 1 from public.web_teacher_subjects) then raise exception 'Payroll privacy failed';end if;
+ if not exists(select 1 from public.web_students where bulletin_blocked) then raise exception 'Restriction missing';end if;
+ update public.web_students set bulletin_blocked=false where user_id=current_setting('qa.student')::uuid;
+ if found then raise exception 'Student changed restriction';end if;
+ if not exists(select 1 from public.web_marks) then raise exception 'Marks no longer accessible';end if;
+end $$;
+rollback;

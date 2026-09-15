@@ -104,3 +104,11 @@ Apply database/student-access.sql after schema.sql and acadexis-management.sql w
 ## RDC bulletin layout
 
 The report uses separate maximum and points columns for periods, exams, terms and the year. Language groups and domains have subtotal rows. Maxima follow each subject's configured period/exam scale: published assignment points are weighted by their maxima onto that scale. Missing evaluations leave points blank, while a recorded zero remains zero. The final rows show maxima, totals and percentages. Rank, class size, application, conduct and signatures remain blank for completion by the school; no unrecorded assessment or promotion decision is inferred. Promotion/repetition checkboxes, place, date, pupil signature, seal and headteacher signature appear below. The demonstration notices were removed from the report at the owner's request.
+
+## Access, staff and receipts
+
+Apply database/staff-management.sql after the existing schema migrations. Main administrators can deactivate/reactivate sub-admin school access from the school directory. School managers can block only bulletin access from the student list, while marks and payments remain visible. Existing sessions refresh permissions periodically and on focus; RLS checks current membership on every database request.
+
+Payment history offers PDF receipts, printing and manual email/WhatsApp sharing to all authorized roles. Personnel & salaires stores optional teachers/workers, teacher-subject assignments and payments in CDF/USD separately. These records are restricted to school managers and do not create teacher login accounts.
+
+Validation: npm run test:unit, npm run build, node scripts/test-staff-receipts.mjs (requires ignored local demo credentials). tests/staff-permissions.sql checks database permissions inside a rolled-back transaction using the dedicated demo data.
