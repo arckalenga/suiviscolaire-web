@@ -124,3 +124,7 @@ Sur HTTPS, parents et élèves peuvent choisir **Activer les notifications**. Su
 Backend : migration supabase/migrations/20260915062721_parent_accounts_and_push.sql ; fonctions web-manage-accounts et web-push. L’action setup de web-push est réservée au main admin et initialise les clés privées une seule fois côté serveur. Ne jamais exporter ces clés. Les tables de livraison sont réservées au service ; les recherches d’autorisation privées vérifient l’utilisateur connecté.
 
 Validation : 14 tests unitaires ; test navigateur parent avec compte temporaire .local/parent-qa.json ; contrôles SQL de révocation et de publication dans des transactions annulées. Le navigateur de test renvoie AbortError lors de l’abonnement au service push : une réception sur téléphone réel reste à vérifier.
+
+### Test session isolation
+
+All API tests using shared demo credentials must call auth.signOut({ scope: "local" }). The default global sign-out revokes sessions on other devices. Account operations now attach the current bearer token explicitly and retry only an authentication rejection (401), once after refreshing. Network errors and server failures are never automatically retried, avoiding duplicate account creation.

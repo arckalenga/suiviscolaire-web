@@ -10,7 +10,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test:browser": "node scripts/test-browser.mjs",
     "test:imports": "node --test tests/imports.test.mjs",
-    "test:unit": "node --test tests/imports.test.mjs tests/student-access.test.mjs tests/report-model.test.mjs tests/push.test.mjs"
+    "test:unit": "node --test tests/imports.test.mjs tests/student-access.test.mjs tests/report-model.test.mjs tests/push.test.mjs tests/auth-invoke.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",

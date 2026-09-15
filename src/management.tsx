@@ -1,3 +1,4 @@
+import { invokeAuthenticated } from "./auth-invoke";
 import {
   studentEmail,
   slug,
@@ -34,9 +35,11 @@ export async function checked(q: any) {
   return r.data;
 }
 export async function account(body: Row) {
-  const { data, error } = await db.functions.invoke("web-manage-accounts", {
+  const { data, error } = await invokeAuthenticated(
+    db,
+    "web-manage-accounts",
     body,
-  });
+  );
   if (error) {
     let message =
       "Opération impossible. Vérifiez votre connexion et vos droits.";
