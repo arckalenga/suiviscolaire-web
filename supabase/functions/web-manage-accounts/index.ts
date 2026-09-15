@@ -52,6 +52,97 @@ Deno.serve(async (req) => {
     if (text.length > 12000)
       return respond({ error: "Requête trop volumineuse." }, 400);
     const b = JSON.parse(text);
+    if (b.action === "parent_access") {
+      if (typeof b.active !== "boolean")
+        return respond({ error: "Action invalide." }, 400);
+      const { data: child } = await admin
+        .from("web_students")
+        .select("school_id")
+        .eq("id", b.student_id)
+        .single();
+      if (!child || !(await canManage(child.school_id)))
+        return respond({ error: "Accès refusé." }, 403);
+      const { data: changed, error } = await admin
+        .from("web_guardians")
+        .update({ active: b.active })
+        .eq("parent_id", b.parent_id)
+        .eq("student_id", b.student_id)
+        .select("student_id");
+      return error || !changed?.length
+        ? respond({ error: "Modification refusée." }, 400)
+        : respond({ ok: true });
+    }
+    if (b.action === "create_parent") {
+      const ids = [
+        ...new Set(Array.isArray(b.student_ids) ? b.student_ids : []),
+      ];
+      const name = String(b.name || "").trim(),
+        email = String(b.email || "")
+          .trim()
+          .toLowerCase();
+      if (
+        !ids.length ||
+        ids.length > 50 ||
+        name.length < 2 ||
+        name.length > 150 ||
+        email.length > 254 ||
+        !/^\S+@\S+\.\S+$/.test(email)
+      )
+        return respond({ error: "Parent et enfants requis." }, 400);
+      const { data: children, error: ce } = await admin
+        .from("web_students")
+        .select("id,school_id")
+        .in("id", ids)
+        .eq("archived", false);
+      if (ce || children?.length !== ids.length)
+        return respond({ error: "Enfants invalides." }, 400);
+      for (const child of children)
+        if (!(await canManage(child.school_id)))
+          return respond({ error: "Accès refusé." }, 403);
+      const { data: existing } = await admin
+        .from("web_parents")
+        .select("user_id")
+        .eq("email", email)
+        .maybeSingle();
+      let uid = existing?.user_id,
+        password: string | undefined;
+      if (!uid) {
+        password = Array.from(crypto.getRandomValues(new Uint8Array(12)), (x) =>
+          x.toString(16).padStart(2, "0"),
+        ).join("");
+        const { data: c, error } = await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+        });
+        if (error || !c.user)
+          return respond(
+            {
+              error:
+                "Création impossible. Cette adresse peut déjà être utilisée par un autre rôle.",
+            },
+            400,
+          );
+        uid = c.user.id;
+      }
+      const { error } = await admin.rpc("web_provision_parent", {
+        uid,
+        full_name: name,
+        mail: email,
+        children: ids,
+      });
+      if (error) {
+        if (!existing) await admin.auth.admin.deleteUser(uid);
+        return respond({ error: "Association impossible." }, 400);
+      }
+      return respond({
+        ok: true,
+        email,
+        ...(password ? { password } : {}),
+        existing: !!existing,
+      });
+    }
+
     if (b.action === "archive_student") {
       if (typeof b.archived !== "boolean")
         return respond({ error: "Action invalide." }, 400);

@@ -1,0 +1,4 @@
+self.addEventListener("install",()=>self.skipWaiting());
+self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));
+self.addEventListener("push",event=>{let data={};try{data=event.data.json()}catch{}event.waitUntil(self.registration.showNotification(data.title||"SuiviScolaire",{body:data.body||"Une nouvelle note est disponible.",tag:data.tag||"marks"}));});
+self.addEventListener("notificationclick",event=>{event.notification.close();event.waitUntil((async()=>{const clients=await self.clients.matchAll({type:"window",includeUncontrolled:true});for(const client of clients){if(client.url.startsWith(self.registration.scope)){client.postMessage({type:"OPEN_NOTIFICATIONS"});return client.focus()}}return self.clients.openWindow(new URL("#notifications",self.registration.scope).href)})());});

@@ -112,3 +112,15 @@ Apply database/staff-management.sql after the existing schema migrations. Main a
 Payment history offers PDF receipts, printing and manual email/WhatsApp sharing to all authorized roles. Personnel & salaires stores optional teachers/workers, teacher-subject assignments and payments in CDF/USD separately. These records are restricted to school managers and do not create teacher login accounts.
 
 Validation: npm run test:unit, npm run build, node scripts/test-staff-receipts.mjs (requires ignored local demo credentials). tests/staff-permissions.sql checks database permissions inside a rolled-back transaction using the dedicated demo data.
+
+## Parents et notifications push
+
+Dans une école, ouvrir **Parents**, puis « Créer un parent / associer des enfants ». Vérifier le lien familial, sélectionner les enfants et transmettre les identifiants au responsable. Pour un autre enfant ou une autre école, réutiliser la même adresse parent : aucun nouveau mot de passe n’est créé. Chaque école ne peut associer que ses propres élèves. « Retirer ce lien » révoque uniquement cette association.
+
+Le parent retrouve toutes ses écoles et enfants dans **Mes enfants**, avec les notifications regroupées. Les comptes élèves restent indépendants. Les restrictions de bulletin s’appliquent aussi aux parents.
+
+Sur HTTPS, parents et élèves peuvent choisir **Activer les notifications**. Sur iPhone/iPad, installer le site sur l’écran d’accueil avant d’activer les notifications. Les alertes indiquent le nom de l’enfant et qu’une note est disponible, jamais les points. La publication d’une évaluation prépare les alertes pour les appareils déjà abonnés ; la file est traitée chaque minute, avec vérification des liens encore actifs, reprises limitées et suppression des abonnements expirés. Désactivation et déconnexion désabonnent cet appareil. Aucune autorisation navigateur n’est demandée automatiquement.
+
+Backend : migration supabase/migrations/20260915062721_parent_accounts_and_push.sql ; fonctions web-manage-accounts et web-push. L’action setup de web-push est réservée au main admin et initialise les clés privées une seule fois côté serveur. Ne jamais exporter ces clés. Les tables de livraison sont réservées au service ; les recherches d’autorisation privées vérifient l’utilisateur connecté.
+
+Validation : 14 tests unitaires ; test navigateur parent avec compte temporaire .local/parent-qa.json ; contrôles SQL de révocation et de publication dans des transactions annulées. Le navigateur de test renvoie AbortError lors de l’abonnement au service push : une réception sur téléphone réel reste à vérifier.

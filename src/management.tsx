@@ -33,7 +33,7 @@ export async function checked(q: any) {
     );
   return r.data;
 }
-async function account(body: Row) {
+export async function account(body: Row) {
   const { data, error } = await db.functions.invoke("web-manage-accounts", {
     body,
   });
@@ -147,7 +147,7 @@ export function ActionForm({
     </form>
   );
 }
-function Credentials({ rows }: { rows: Row[] }) {
+export function Credentials({ rows }: { rows: Row[] }) {
   return rows.length ? (
     <section className="credential-result">
       <h3>Identifiants créés — à conserver</h3>
@@ -1016,7 +1016,7 @@ export function Notifications({
   refresh,
 }: {
   items: Row[];
-  go: (s: string) => void;
+  go: (s: string, item?: Row) => void;
   reads: string[];
   refresh: Refresh;
 }) {
@@ -1048,7 +1048,7 @@ export function Notifications({
               className="button secondary"
               onClick={async () => {
                 setError("");
-                go(n.destination);
+                go(n.destination, n);
                 try {
                   await checked(
                     db

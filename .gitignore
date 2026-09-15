@@ -5,3 +5,5 @@ dist/
 .local/
 *.local.*
 *.tsbuildinfo
+
+supabase/.temp/

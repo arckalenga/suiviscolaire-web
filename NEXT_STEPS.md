@@ -18,7 +18,7 @@
 - Add teacher login roles, attendance, absences, rankings and promotion decisions. Teacher records and subject assignments are implemented.
 - Add fee schedules, invoices and outstanding balances. Downloadable/printable receipts and manual sharing are implemented.
 - Add editing/removing timetable slots and overlap validation.
-- Add replies and external notification delivery. Current communications and notifications are in-app.
+- Add replies and email/WhatsApp notification delivery. In-app notifications and optional web push for published marks are implemented.
 - Add editing an existing sub-admin's school assignments and administrator-driven account recovery.
 - Student Excel imports currently create new students; existing students are edited individually.
 - Improve large-network notification pagination and archival.
@@ -43,3 +43,9 @@
 - Add payroll period filters, editing/correction workflows and pagination for very large staff histories. Current records track payments already made, not salary calculation or transfers.
 - Receipt sharing uses the device share sheet when supported; otherwise download and attach the PDF manually through email/WhatsApp. Automated delivery and delivery tracking need a configured provider.
 - Bulletin restrictions hide the in-app report and block its normal PDF/print controls; marks intentionally remain readable. They cannot revoke previously downloaded copies or prevent reconstruction from visible marks. Add server-issued signed report snapshots if document authenticity is required.
+
+## Parent and push follow-up
+
+- Verify actual push reception on Android and an installed iPhone/iPad web app; the automated Edge browser returned AbortError registering with its push service. Queue creation, server worker authentication, access revocation and service-worker behavior are checked.
+- Add parent self-service password changes/recovery after email delivery is configured. Parent account creation currently gives the school a generated password to deliver privately.
+- Add notification pagination/read management across the family dashboard and operational monitoring for deliveries exhausting five attempts. Push delivery is best effort; in-app notifications remain the source of truth.

@@ -1,3 +1,5 @@
+import { PushSettings, stopPush } from "./PushSettings";
+import { ParentManager, FamilyHome } from "./Parents";
 import { Personnel } from "./Personnel";
 import { ReceiptActions } from "./ReceiptActions";
 import { Bulletin } from "./Bulletin";
@@ -88,6 +90,7 @@ const nav = [
   ["timetable", "Emploi du temps", CalendarDays],
   ["notifications", "Notifications", Bell],
   ["online", "Payer en ligne", CreditCard],
+  ["parents", "Parents", Users],
   ["personnel", "Personnel & salaires", Users],
   ["settings", "Paramètres", Settings],
 ] as const;
@@ -97,8 +100,11 @@ function App() {
     [schools, setSchools] = useState<Row[]>([]),
     [members, setMembers] = useState<Row[]>([]),
     [main, setMain] = useState(false),
+    [parent, setParent] = useState(false),
     [selected, setSelected] = useState<Row | null>(null),
-    [tab, setTab] = useState("overview"),
+    [tab, setTab] = useState(
+      window.location.hash === "#notifications" ? "notifications" : "overview",
+    ),
     [data, setData] = useState<Data>(empty),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -136,6 +142,15 @@ function App() {
 
   const [reads, setReads] = useState<string[]>([]);
   useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const receive = (event: MessageEvent) => {
+      if (event.data?.type === "OPEN_NOTIFICATIONS") setTab("notifications");
+    };
+    navigator.serviceWorker.addEventListener("message", receive);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", receive);
+  }, []);
+  useEffect(() => {
     const change = () =>
       setPublicPage(window.location.hash === "#connexion" ? "login" : "home");
     window.addEventListener("hashchange", change);
@@ -170,6 +185,7 @@ function App() {
         setTab("overview");
         setStudentId("");
         setMain(false);
+        setParent(false);
       }
     });
     return () => subscription.unsubscribe();
@@ -182,10 +198,11 @@ function App() {
     const userId = session.user.id;
     setBusy(true);
     setError("");
-    const [s, m, a] = await Promise.all([
+    const [s, m, a, p] = await Promise.all([
       db.from("web_schools").select("*").order("name"),
       db.from("web_memberships").select("*").eq("user_id", session!.user.id),
       db.from("web_admins").select("*").eq("user_id", session!.user.id),
+      db.from("web_parents").select("user_id").eq("user_id", session!.user.id),
     ]);
     if (sessionScope.current !== userId) return;
     if (s.error || m.error || a.error)
@@ -202,6 +219,7 @@ function App() {
       }
       setMembers(m.data || []);
       setMain(!!a.data?.length);
+      setParent(!!p.data?.length);
       if (
         s.data?.length === 1 &&
         !a.data?.length &&
@@ -229,7 +247,7 @@ function App() {
       if (
         !main &&
         selected &&
-        !r.data?.some((m) => m.school_id === selected.id && m.active)
+        !(await db.rpc("web_access", { sid: selected.id })).data
       ) {
         requestId.current++;
         setSelected(null);
@@ -370,10 +388,11 @@ function App() {
     setError("");
   };
   function StudentPicker() {
-    return manager ? (
+    return manager || parent ? (
       <label className="inline-label">
         Élève
         <select
+          aria-label="Élève"
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
         >
@@ -403,7 +422,9 @@ function App() {
             ? "ADMINISTRATION PRINCIPALE"
             : isStaff
               ? "ADMINISTRATION SCOLAIRE"
-              : "ESPACE ÉLÈVE"}
+              : parent
+                ? "ESPACE PARENT"
+                : "ESPACE ÉLÈVE"}
         </div>
         <button
           className={"school-switch " + (!selected ? "active" : "")}
@@ -426,9 +447,13 @@ function App() {
               .filter(
                 ([id]) =>
                   manager ||
-                  !["students", "classes", "settings", "personnel"].includes(
-                    id,
-                  ),
+                  ![
+                    "students",
+                    "classes",
+                    "settings",
+                    "parents",
+                    "personnel",
+                  ].includes(id),
               )
               .map(([id, label, Icon]) => (
                 <button
@@ -447,7 +472,7 @@ function App() {
           </div>
           <div className="account">
             <span className="avatar">
-              {main ? "AP" : isStaff ? "SA" : "ÉL"}
+              {main ? "AP" : isStaff ? "SA" : parent ? "PA" : "ÉL"}
             </span>
             <span>
               <strong>
@@ -455,7 +480,9 @@ function App() {
                   ? "Administrateur"
                   : isStaff
                     ? "Sous-administrateur"
-                    : "Élève"}
+                    : parent
+                      ? "Parent"
+                      : "Élève"}
               </strong>
               <small>{session.user.email}</small>
             </span>
@@ -463,6 +490,7 @@ function App() {
           <button
             className="logout"
             onClick={async () => {
+              await stopPush().catch(() => {});
               await db.auth.signOut({ scope: "local" });
               setSelected(null);
               setData(empty);
@@ -496,7 +524,17 @@ function App() {
               {notice}
             </div>
           )}
-          {!selected ? (
+          {!isStaff && <PushSettings userId={session.user.id} />}
+          {!selected && parent ? (
+            <FamilyHome
+              schools={schools}
+              open={(school, child, next = "overview") => {
+                setStudentId(child);
+                setSelected(school);
+                setTab(next);
+              }}
+            />
+          ) : !selected ? (
             <>
               <div className="page-heading">
                 <div>
@@ -585,6 +623,11 @@ function App() {
                   </button>
                 )}
               </div>
+              {parent && (
+                <div className="toolbar no-print">
+                  <StudentPicker />
+                </div>
+              )}
               {busy ? (
                 <div className="loading">Chargement des informations…</div>
               ) : (
@@ -795,11 +838,22 @@ function App() {
                     <Notifications
                       items={data.notifications}
                       reads={reads}
-                      go={go}
+                      go={(destination, item) => {
+                        if (parent && item?.student_id)
+                          setStudentId(item.student_id);
+                        go(destination);
+                      }}
                       refresh={refreshReads}
                     />
                   )}
                   {tab === "online" && <OnlinePayment />}
+                  {tab === "parents" && manager && (
+                    <ParentManager
+                      key={selected.id}
+                      school={selected}
+                      students={data.students}
+                    />
+                  )}
                   {tab === "personnel" && manager && (
                     <Personnel
                       key={selected.id}
@@ -1107,7 +1161,12 @@ function App() {
                           <section className="day" key={day}>
                             <h2>{day}</h2>
                             {data.timetable
-                              .filter((t) => t.day === i + 1)
+                              .filter(
+                                (t) =>
+                                  t.day === i + 1 &&
+                                  (manager ||
+                                    t.class_name === student?.class_name),
+                              )
                               .sort((a, b) =>
                                 a.starts_at.localeCompare(b.starts_at),
                               )
