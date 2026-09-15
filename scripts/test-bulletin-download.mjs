@@ -24,7 +24,10 @@ try {
     acceptDownloads: true,
   });
   const errors = [];
-  page.on("response", r => { if (r.status() >= 400) console.log("HTTP",r.status(),new URL(r.url()).pathname); });
+  page.on("response", (r) => {
+    if (r.status() >= 400)
+      console.log("HTTP", r.status(), new URL(r.url()).pathname);
+  });
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(base);
   await page.screenshot({
@@ -53,9 +56,31 @@ try {
     }
     await page.getByRole("button", { name: "Bulletins", exact: true }).click();
     await page.locator(".bulletin").waitFor();
+    assert.ok((await page.locator(".maxima").innerText()).includes("3360"));
+    assert.equal(await page.locator(".report-table td small").count(), 0);
+    assert.equal(await page.locator(".subject-row").count(), 19);
+    const first = page.locator(".subject-row").first();
+    assert.equal(await first.locator("td").nth(1).innerText(), "20");
+    assert.ok(!(await first.locator("td").nth(2).innerText()).includes("/"));
+    assert.equal(await page.locator(".domain-subtotal").count(), 5);
+    const reportText = await page.locator(".bulletin").innerText();
+    for (const label of [
+      "MAXIMA GÉNÉRAUX",
+      "TOTAUX",
+      "POURCENTAGE",
+      "PLACE DE L’ÉLÈVE",
+      "APPLICATION",
+      "CONDUITE DE L’ÉLÈVE",
+      "SIGNATURE DU RESPONSABLE",
+    ])
+      assert.ok(reportText.includes(label));
     assert.ok(
-      (await page.locator(".bulletin-result").innerText()).includes("3360"),
+      !reportText.includes("MODÈLE DE DÉMONSTRATION") &&
+        !reportText.includes("Seules les évaluations"),
     );
+    await page
+      .locator(".bulletin")
+      .screenshot({ path: ".local/pdf-checks/" + role + "-report.png" });
     const downloading = page.waitForEvent("download");
     await page
       .getByRole("button", { name: "Télécharger le PDF", exact: true })
@@ -81,7 +106,8 @@ try {
     }
     if (role === "student") {
       await page
-        .getByRole("navigation").getByRole("button", { name: "Vue d’ensemble", exact: true })
+        .getByRole("navigation")
+        .getByRole("button", { name: "Vue d’ensemble", exact: true })
         .click();
       await page.setViewportSize({ width: 390, height: 844 });
       await page.screenshot({

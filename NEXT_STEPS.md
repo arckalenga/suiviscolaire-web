@@ -26,9 +26,9 @@
 ## RDC report cards
 
 - Preserve the implemented primary demonstration with configurable school periods and reference maxima.
-- Refine official institution codes, permanent student numbers, educational province, domain subtotals, conduct/application, rankings and signatures.
+- Refine official institution codes, permanent student numbers, educational province, persisted conduct/application, rankings and digital signatures.
 - Add grade-level/class-specific templates and immutable publication snapshots.
-- Current bulletins calculate from published assignments and current marks. Missing evaluations are shown as a dash, never silently treated as zero.
+- Current bulletins calculate from published assignments and current marks. Missing evaluations leave the report cell blank, never silently treated as zero.
 - Validate the final official print template with each school and the relevant education authority.
 
 ## Engineering

@@ -93,7 +93,7 @@ try {
   await page.getByRole("button", { name: "Bulletins", exact: true }).click();
   await page.locator(".bulletin").waitFor();
   check(
-    (await page.locator(".bulletin-result").textContent()).includes("3360"),
+    (await page.locator(".report-table .maxima").textContent()).includes("3360"),
     "RDC report has 3360 maximum",
   );
   await page.screenshot({

@@ -11,13 +11,13 @@ export function buildBulletinPdf(element: HTMLElement, filename: string) {
     0,
   );
   const doc = new jsPDF({
-    orientation: columns > 16 ? "landscape" : "portrait",
+    orientation: columns > 24 ? "landscape" : "portrait",
     unit: "mm",
     format: "a4",
   });
   const width = doc.internal.pageSize.getWidth(),
     height = doc.internal.pageSize.getHeight();
-  const margin = 10,
+  const margin = 7,
     contentWidth = width - 2 * margin;
   doc.setProperties({
     title: filename.replace(/\.pdf$/, ""),
@@ -36,7 +36,7 @@ export function buildBulletinPdf(element: HTMLElement, filename: string) {
     { align: "center" },
   );
   doc.setFontSize(9);
-  doc.text("BULLETIN SCOLAIRE - MODÈLE DE DÉMONSTRATION", width / 2, 28, {
+  doc.text("BULLETIN SCOLAIRE", width / 2, 28, {
     align: "center",
   });
   doc
@@ -74,14 +74,19 @@ export function buildBulletinPdf(element: HTMLElement, filename: string) {
         content: cellText(cell),
         colSpan: cell.colSpan,
         rowSpan: cell.rowSpan,
-        styles: row.classList.contains("domain")
-          ? {
-              fillColor: [234, 239, 246] as [number, number, number],
-              fontStyle: "bold" as const,
-              halign:
-                cell.colSpan > 1 ? ("left" as const) : ("center" as const),
-            }
-          : {},
+        styles:
+          row.classList.contains("domain") ||
+          row.classList.contains("subtotal") ||
+          row.classList.contains("branch-group") ||
+          row.classList.contains("maxima") ||
+          row.classList.contains("totals")
+            ? {
+                fillColor: [234, 239, 246] as [number, number, number],
+                fontStyle: "bold" as const,
+                halign:
+                  cell.colSpan > 1 ? ("left" as const) : ("center" as const),
+              }
+            : {},
       })),
     );
   autoTable(doc, {
@@ -94,8 +99,8 @@ export function buildBulletinPdf(element: HTMLElement, filename: string) {
     rowPageBreak: "avoid",
     styles: {
       font: "helvetica",
-      fontSize: columns > 16 ? 6.5 : 7,
-      cellPadding: 0.85,
+      fontSize: columns > 24 ? 6 : 5.5,
+      cellPadding: 0.45,
       textColor: 25,
       lineColor: [168, 179, 192],
       lineWidth: 0.15,
@@ -103,35 +108,41 @@ export function buildBulletinPdf(element: HTMLElement, filename: string) {
       valign: "middle",
       overflow: "linebreak",
     },
-    headStyles: { fillColor: [30, 57, 94], textColor: 255, fontSize: 6.5 },
-    columnStyles: { 0: { cellWidth: contentWidth * 0.24, halign: "left" } },
+    headStyles: { fillColor: [30, 57, 94], textColor: 255, fontSize: 5.5 },
+    columnStyles: { 0: { cellWidth: contentWidth * 0.23, halign: "left" } },
   });
   y =
     (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
       .finalY + 7;
-  const result = Array.from(element.querySelectorAll(".bulletin-result strong"))
-    .map((el) => clean(el.textContent || ""))
-    .join("    ");
-  const note = clean(element.querySelector(".report-note")?.textContent || "");
-  const resultLines = doc.setFontSize(8).splitTextToSize(result, contentWidth);
-  const noteLines = doc.setFontSize(7).splitTextToSize(note, contentWidth);
-  if (y + resultLines.length * 4 + noteLines.length * 3.5 + 29 > height - 15) {
+  if (y + 35 > height - 15) {
     doc.addPage();
     y = 18;
   }
-  doc.setFont("helvetica", "bold").setFontSize(8).text(resultLines, margin, y);
-  y += resultLines.length * 4 + 4;
-  doc.setFont("helvetica", "normal").setFontSize(7).text(noteLines, margin, y);
-  y += noteLines.length * 3.5 + 17;
-  [
-    "Signature du responsable",
-    "Sceau de l'école",
-    "Chef d'établissement",
-  ].forEach((label, i) => {
-    const x = margin + (contentWidth * (i + 0.5)) / 3;
-    doc.setDrawColor(170).line(x - 21, y, x + 21, y);
-    doc.text(label, x, y + 5, { align: "center" });
-  });
+  doc.setTextColor(20).setFont("helvetica", "normal").setFontSize(7);
+  doc.rect(margin, y - 2, 2, 2);
+  doc.text("L'élève passe dans la classe supérieure.", margin + 4, y);
+  doc.rect(margin, y + 3, 2, 2);
+  doc.text("L'élève double la classe.", margin + 4, y + 5);
+  doc.text(
+    "Fait à .............................. le ...... / ...... / ............",
+    width - margin,
+    y,
+    { align: "right" },
+  );
+  y += 24;
+  ["Signature de l'élève", "Sceau de l'école", "Chef d'établissement"].forEach(
+    (label, i) => {
+      const x = margin + (contentWidth * (i + 0.5)) / 3;
+      doc.setDrawColor(150).line(x - 19, y, x + 19, y);
+      doc
+        .setFont("helvetica", "bold")
+        .text(label, x, y + 4, { align: "center" });
+      if (i === 2)
+        doc
+          .setFont("helvetica", "normal")
+          .text("Nom et signature", x, y + 8, { align: "center" });
+    },
+  );
   const count = doc.getNumberOfPages();
   for (let page = 1; page <= count; page++) {
     doc.setPage(page).setFontSize(7).setTextColor(100);

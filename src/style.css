@@ -1331,3 +1331,24 @@ footer span {
     font-size: 10px;
   }
 }
+
+.rdc-bulletin .report-table { min-width: 1100px; }
+.rdc-bulletin .report-table th { white-space: normal; }
+.rdc-bulletin .report-table th:first-child { text-align: left; }
+.rdc-bulletin .max-cell { background: #f1f2f3; }
+.rdc-bulletin .mark-cell { background: #fff; }
+.rdc-bulletin .subtotal > * { font-weight: bold; border-top: 1.5px solid #555; }
+.rdc-bulletin .branch-group th { text-transform: uppercase; background: #edf0f2; text-align: left; }
+.rdc-bulletin .summary-row > * { height: 26px; }
+.rdc-bulletin .maxima > *, .rdc-bulletin .totals > * { font-weight: bold; }
+.report-decision { display: flex; justify-content: space-between; gap: 25px; padding-top: 20px; font: 11px Georgia, serif; }
+.report-decision p { margin: 4px 0; }
+.rdc-bulletin .signatures { min-height: 95px; font-weight: bold; }
+@media print {
+ .rdc-bulletin .report-table { min-width: 0; width: 100%; }
+ .rdc-bulletin .report-table td, .rdc-bulletin .report-table th { font-size: 5.5px; padding: 1px; white-space: normal; }
+ .rdc-bulletin .report-table .domain th { font-size: 6px; padding: 2px; }
+ .rdc-bulletin .summary-row > * { height: 12px; }
+ .rdc-bulletin .signatures { min-height: 45px; font-size: 8px; }
+ .report-decision { font-size: 8px; break-inside: avoid; padding-top: 10px; }
+}

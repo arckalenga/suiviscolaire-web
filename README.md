@@ -100,3 +100,7 @@ Every role can use Bulletins > Télécharger le PDF. Administrators first select
 Verification: npm run test:imports, node --test tests/student-access.test.mjs, node scripts/test-bulletin-download.mjs. The last test uses private demo credentials in .local/accounts.json and saves local PDF and screenshot samples under .local/pdf-checks/.
 
 Apply database/student-access.sql after schema.sql and acadexis-management.sql when setting up a fresh dedicated project. The deployed web-manage-accounts function must include student-access.ts beside index.ts.
+
+## RDC bulletin layout
+
+The report uses separate maximum and points columns for periods, exams, terms and the year. Language groups and domains have subtotal rows. Maxima follow each subject's configured period/exam scale: published assignment points are weighted by their maxima onto that scale. Missing evaluations leave points blank, while a recorded zero remains zero. The final rows show maxima, totals and percentages. Rank, class size, application, conduct and signatures remain blank for completion by the school; no unrecorded assessment or promotion decision is inferred. Promotion/repetition checkboxes, place, date, pupil signature, seal and headteacher signature appear below. The demonstration notices were removed from the report at the owner's request.
