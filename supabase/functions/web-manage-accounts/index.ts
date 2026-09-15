@@ -1,6 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 const allowed = new Set([
   "https://arckalenga.github.io",
+  "https://suiviscolaire.info",
+  "https://www.suiviscolaire.info",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5176",
   "http://localhost:5173",
