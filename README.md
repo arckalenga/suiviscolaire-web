@@ -2,13 +2,13 @@
 
 React + TypeScript + Supabase school management, published on GitHub Pages. No PHP.
 
-**Website:** https://arckalenga.github.io/suiviscolaire-web/
+**Website:** https://suiviscolaire.info/
 
 ## Custom domain
 
 Prepared for `suiviscolaire.info` and `www.suiviscolaire.info`. Relative asset paths support both the GitHub project URL and the domain root. Account-management requests allow both HTTPS origins.
 
-Before switching DNS, set the Pages custom domain to `suiviscolaire.info` in repository Settings > Pages. At Porkbun, edit the root ALIAS to `arckalenga.github.io` and replace the parking wildcard CNAME with an explicit `www` CNAME pointing to `arckalenga.github.io` (TTL 600). Preserve unrelated records. Enable HTTPS once GitHub issues the certificate, then verify both addresses and login. DNS/account sign-in is still pending as of 2026-09-15.
+Before switching DNS, set the Pages custom domain to `suiviscolaire.info` in repository Settings > Pages. At Porkbun, edit the root ALIAS to `arckalenga.github.io` and replace the parking wildcard CNAME with an explicit `www` CNAME pointing to `arckalenga.github.io` (TTL 600). Preserve unrelated records. Enable HTTPS once GitHub issues the certificate, then verify both addresses and login. Domain and DNS configured on 2026-09-15; GitHub certificate issuance and HTTPS enforcement are pending.
 
 ## Public welcome page
 
