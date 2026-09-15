@@ -10,6 +10,7 @@ import {
   Target,
   Instagram,
   Phone,
+  Mail,
 } from "lucide-react";
 export function Landing({ login }: { login: () => void }) {
   return (
@@ -192,6 +193,13 @@ export function Landing({ login }: { login: () => void }) {
             </p>
           </div>
           <div className="contact-links">
+            <a href="mailto:contact@suiviscolaire.info">
+              <Mail />
+              <span>
+                E-mail<strong>contact@suiviscolaire.info</strong>
+              </span>
+              <ArrowRight />
+            </a>
             <a
               href="https://www.instagram.com/acadexis_official"
               target="_blank"
