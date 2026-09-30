@@ -161,9 +161,16 @@ Deno.serve(async (req) => {
         ? respond({ error: "Modification impossible." }, 400)
         : respond({ ok: true });
     }
-    if (!["create_student", "create_subadmin"].includes(b.action))
+    if (
+      ![
+        "create_student",
+        "create_subadmin",
+        "create_finance",
+        "create_gestionnaire",
+      ].includes(b.action)
+    )
       return respond({ error: "Action inconnue." }, 400);
-    const role = b.action === "create_student" ? "student" : "subadmin";
+    const role = b.action.slice(7);
     const schoolIds = Array.from(
       new Set(Array.isArray(b.school_ids) ? b.school_ids : []),
     ) as string[];
@@ -175,7 +182,7 @@ Deno.serve(async (req) => {
       )
     )
       return respond({ error: "Établissement requis." }, 400);
-    if (role === "subadmin") {
+    if (role !== "student") {
       const { data, error } = await scoped.rpc("web_is_admin");
       if (error || !data)
         return respond({ error: "Administrateur principal requis." }, 403);

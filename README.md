@@ -109,7 +109,7 @@ The report uses separate maximum and points columns for periods, exams, terms an
 
 Apply database/staff-management.sql after the existing schema migrations. Main administrators can deactivate/reactivate sub-admin school access from the school directory. School managers can block only bulletin access from the student list, while marks and payments remain visible. Existing sessions refresh permissions periodically and on focus; RLS checks current membership on every database request.
 
-Payment history offers PDF receipts, printing and manual email/WhatsApp sharing to all authorized roles. Personnel & salaires stores optional teachers/workers, teacher-subject assignments and payments in CDF/USD separately. These records are restricted to school managers and do not create teacher login accounts.
+Payment history offers PDF receipts, printing and manual email/WhatsApp sharing to all authorized roles. Personnel & salaires stores optional teachers/workers, teacher-subject assignments and payments in CDF/USD separately. School staff may read these records; only financiers and the main administrator can record payments. Worker records do not create teacher login accounts.
 
 Validation: npm run test:unit, npm run build, node scripts/test-staff-receipts.mjs (requires ignored local demo credentials). tests/staff-permissions.sql checks database permissions inside a rolled-back transaction using the dedicated demo data.
 
@@ -128,3 +128,29 @@ Validation : 14 tests unitaires ; test navigateur parent avec compte temporaire 
 ### Test session isolation
 
 All API tests using shared demo credentials must call auth.signOut({ scope: "local" }). The default global sign-out revokes sessions on other devices. Account operations now attach the current bearer token explicitly and retry only an authentication rejection (401), once after refreshing. Network errors and server failures are never automatically retried, avoiding duplicate account creation.
+
+## Finance, gestionnaire et présences
+
+Chaque école possède désormais un compte de test financier et un compte de test gestionnaire. Les identifiants sont uniquement dans les fichiers locaux ignorés .local/finance-management-credentials.json et .local/FINANCE_GESTION_CREDENTIALS.md. Le main admin peut créer d’autres comptes ou désactiver leurs accès depuis la liste des établissements.
+
+| Action | Main admin | Sous-admin | Financier | Gestionnaire |
+|---|---|---|---|---|
+| Créer des comptes de gestion | Oui | Non | Non | Non |
+| Gérer élèves, classes, notes et communications | Oui | Oui | Lecture | Lecture |
+| Enregistrer les paiements élèves/personnel | Oui | Non | Oui | Non |
+| Consulter le suivi financier | Oui | Oui | Oui | Oui |
+| Saisir/importer les présences élèves/personnel | Oui | Oui | Non | Non |
+| Consulter les présences | Oui | Oui | Oui | Oui |
+| Envoyer les reçus via le service connecté | Oui | Non | Oui | Non |
+
+Les nouveaux rôles sont limités à leurs écoles par RLS. web_manage reste réservé au main admin/sous-admin ; web_finance autorise le main admin/financier. Les droits d’écriture sont contrôlés dans PostgreSQL et les fonctions, pas seulement par les boutons.
+
+**Présences** : choisir Élèves ou Personnel, la date et éventuellement la classe. Saisir chaque statut ou télécharger le modèle Excel. L’import vérifie les identifiants, statuts et doublons puis affiche un aperçu. Une confirmation importe au maximum 500 lignes dans une transaction : toute ligne invalide annule le lot. Les présences non renseignées ne sont pas considérées comme présentes. Les corrections sont enregistrées dans le journal.
+
+**Suivi financier** : période libre ou Aujourd’hui, recettes élèves, versements au personnel et différence séparés par devise CDF/USD. La différence n’est pas un solde bancaire. Le tableau reprend les opérations et un journal des 100 dernières modifications de paiements/présences. Aucun paiement bancaire réel n’est exécuté.
+
+**Envois & contacts** : contacts principaux, préférences de réception et historique. Les adaptateurs email/WhatsApp sont préparés mais désactivés. Voir [MESSAGING_SETUP.md](MESSAGING_SETUP.md). Les secrets restent uniquement dans Supabase ; le navigateur ne reçoit jamais de clé d’expédition.
+
+Appliquer les migrations 20260930125544_school_finance_attendance.sql et 20260930130232_delivery_contacts.sql après les migrations précédentes. Déployer web-manage-accounts (avec student-access.ts) et web-delivery (avec delivery-policy.ts). Ces fonctions valident elles-mêmes le JWT via getUser ; verify_jwt est désactivé uniquement au niveau passerelle.
+
+Validation : 23 tests unitaires, TypeScript/build, scripts/test-school-operations.mjs (cinq rôles et aperçu Excel), scripts/test-delivery-access.mjs (huit comptes, école autorisée, absence de configuration), tests/finance-attendance-permissions.sql (transaction annulée). Aucun email ou WhatsApp réel envoyé.

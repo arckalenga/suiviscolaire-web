@@ -42,6 +42,7 @@ elif mode=='dispatch':
 elif mode=='scan':
  tracked=subprocess.run(['git','ls-files','-z'],stdout=subprocess.PIPE,check=True).stdout.decode().split('\0')
  secrets=[token,json.loads(Path('.local/setup.json').read_text())['token']]+[a['password'] for a in json.loads(Path('.local/accounts.json').read_text(encoding='utf-8'))]
+ if Path('.local/finance-management-credentials.json').exists():secrets += [a['password'] for a in json.loads(Path('.local/finance-management-credentials.json').read_text(encoding='utf-8'))]
  for filename in filter(None,tracked):
   if filename.startswith('.local/') or filename.startswith('.env') and filename!='.env.example':raise SystemExit('Private file staged: '+filename)
   content=Path(filename).read_bytes()

@@ -15,7 +15,10 @@ do $$ declare wid uuid; begin
  if not public.web_manage(current_setting('qa.school')::uuid) then raise exception 'Reactivation failed';end if;
  insert into public.web_workers(school_id,name,kind) values(current_setting('qa.school')::uuid,'QA rollback teacher','teacher') returning id into wid;
  insert into public.web_teacher_subjects(school_id,worker_id,subject_id) select current_setting('qa.school')::uuid,wid,id from public.web_subjects where school_id=current_setting('qa.school')::uuid limit 1;
+ begin
  insert into public.web_staff_payments(school_id,worker_id,label,amount,currency,paid_on,reference) values(current_setting('qa.school')::uuid,wid,'QA rollback',15,'USD',current_date,'QA');
+ raise exception 'Subadmin must not record payroll';
+ exception when insufficient_privilege then null; end;
  update public.web_students set bulletin_blocked=true where user_id=current_setting('qa.student')::uuid;
  begin perform public.web_set_subadmin_active(current_setting('qa.sub')::uuid,false);raise exception 'Unexpected admin access';exception when raise_exception then if sqlerrm='Unexpected admin access' then raise;end if;end;
 end $$;

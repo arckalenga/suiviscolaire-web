@@ -220,7 +220,10 @@ export function MainControls({
   async function load() {
     const [s, m] = await Promise.all([
       db.from("web_staff").select("*"),
-      db.from("web_memberships").select("*").eq("role", "subadmin"),
+      db
+        .from("web_memberships")
+        .select("*")
+        .in("role", ["subadmin", "finance", "gestionnaire"]),
     ]);
     setStaff(s.data || []);
     setMembers(m.data || []);
@@ -262,15 +265,15 @@ export function MainControls({
         </details>
         <details className="panel form-panel">
           <summary>
-            <Plus size={16} /> Créer un sous-administrateur
+            <Plus size={16} /> Créer un accès de gestion
           </summary>
           <ActionForm
             title="Nouvel accès de gestion"
-            label="Créer le sous-administrateur"
+            label="Créer le compte"
             submit={async (f) => {
               if (!chosen.length) throw Error("Choisissez au moins une école.");
               const result = await account({
-                action: "create_subadmin",
+                action: "create_" + f.role,
                 name: f.name,
                 email: f.email,
                 school_ids: chosen,
@@ -279,6 +282,15 @@ export function MainControls({
               await load();
             }}
           >
+            <Select
+              label="Rôle"
+              name="role"
+              items={[
+                { value: "subadmin", label: "Sous-administrateur" },
+                { value: "finance", label: "Financier" },
+                { value: "gestionnaire", label: "Gestionnaire" },
+              ]}
+            />
             <Input label="Nom complet" name="name" />
             <Input label="Email" name="email" type="email" />
             <fieldset className="school-checkboxes">
@@ -305,7 +317,7 @@ export function MainControls({
       </div>
       <Credentials rows={credentials} />
       <details open className="panel form-panel">
-        <summary>Gérer les sous-administrateurs ({staff.length})</summary>
+        <summary>Gérer les accès du personnel ({staff.length})</summary>
         <Feedback error={staffError} />
         <div className="table-scroll">
           <table>
@@ -326,7 +338,15 @@ export function MainControls({
                     {members
                       .filter((m) => m.user_id === s.user_id)
                       .map(
-                        (m) => schools.find((s) => s.id === m.school_id)?.name,
+                        (m) =>
+                          (schools.find((s) => s.id === m.school_id)?.name ||
+                            "") +
+                          " · " +
+                          ({
+                            subadmin: "Sous-admin",
+                            finance: "Financier",
+                            gestionnaire: "Gestionnaire",
+                          }[m.role as string] || m.role),
                       )
                       .join(", ")}
                   </td>

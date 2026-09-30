@@ -1,3 +1,4 @@
+import { SendNotice } from "./DeliveryCenter";
 import { useEffect, useState } from "react";
 import { db } from "./client";
 import { ActionForm, Input, Select, checked } from "./management";
@@ -5,9 +6,13 @@ type Row = Record<string, any>;
 export function Personnel({
   school,
   subjects,
+  canManagePeople,
+  canRecordPayment,
 }: {
   school: Row;
   subjects: Row[];
+  canManagePeople: boolean;
+  canRecordPayment: boolean;
 }) {
   const [workers, setWorkers] = useState<Row[]>([]),
     [links, setLinks] = useState<Row[]>([]),
@@ -69,74 +74,74 @@ export function Personnel({
         ))}
       </div>
       <div className="two-columns">
-        <details className="panel form-panel">
-          <summary>Ajouter un enseignant ou travailleur</summary>
-          <ActionForm
-            title="Personnel de l’école"
-            submit={async (f: Row) => {
-              await checked(
-                db
-                  .from("web_workers")
-                  .insert({
+        {canManagePeople && (
+          <details className="panel form-panel">
+            <summary>Ajouter un enseignant ou travailleur</summary>
+            <ActionForm
+              title="Personnel de l’école"
+              submit={async (f: Row) => {
+                await checked(
+                  db.from("web_workers").insert({
                     school_id: school.id,
                     name: f.name.trim(),
                     kind: f.kind,
                   }),
-              );
-              await load();
-            }}
-          >
-            <Input label="Nom complet" name="name" maxLength={150} />
-            <Select
-              label="Fonction"
-              name="kind"
-              items={[
-                { value: "teacher", label: "Enseignant" },
-                { value: "worker", label: "Travailleur" },
-              ]}
-            />
-          </ActionForm>
-        </details>
-        <details className="panel form-panel">
-          <summary>Enregistrer un paiement au personnel</summary>
-          {choices.length ? (
-            <ActionForm
-              title="Paiement effectué"
-              submit={async (f: Row) => {
-                await checked(
-                  db
-                    .from("web_staff_payments")
-                    .insert({
-                      ...f,
-                      school_id: school.id,
-                      amount: Number(f.amount),
-                    }),
                 );
                 await load();
               }}
             >
-              <Select label="Bénéficiaire" name="worker_id" items={choices} />
-              <Input label="Libellé / période" name="label" maxLength={200} />
-              <Input
-                label="Montant"
-                name="amount"
-                type="number"
-                min=".01"
-                step=".01"
-              />
+              <Input label="Nom complet" name="name" maxLength={150} />
               <Select
-                label="Devise"
-                name="currency"
-                items={["CDF", "USD"]}
-                value={school.currency}
+                label="Fonction"
+                name="kind"
+                items={[
+                  { value: "teacher", label: "Enseignant" },
+                  { value: "worker", label: "Travailleur" },
+                ]}
               />
-              <Input label="Date du paiement" name="paid_on" type="date" />
-              <Input label="Référence" name="reference" maxLength={150} />
             </ActionForm>
-          ) : (
-            <p>Ajoutez d’abord un membre du personnel.</p>
-          )}
-        </details>
+          </details>
+        )}
+        {canRecordPayment && (
+          <details className="panel form-panel">
+            <summary>Enregistrer un paiement au personnel</summary>
+            {choices.length ? (
+              <ActionForm
+                title="Paiement effectué"
+                submit={async (f: Row) => {
+                  await checked(
+                    db.from("web_staff_payments").insert({
+                      ...f,
+                      school_id: school.id,
+                      amount: Number(f.amount),
+                    }),
+                  );
+                  await load();
+                }}
+              >
+                <Select label="Bénéficiaire" name="worker_id" items={choices} />
+                <Input label="Libellé / période" name="label" maxLength={200} />
+                <Input
+                  label="Montant"
+                  name="amount"
+                  type="number"
+                  min=".01"
+                  step=".01"
+                />
+                <Select
+                  label="Devise"
+                  name="currency"
+                  items={["CDF", "USD"]}
+                  value={school.currency}
+                />
+                <Input label="Date du paiement" name="paid_on" type="date" />
+                <Input label="Référence" name="reference" maxLength={150} />
+              </ActionForm>
+            ) : (
+              <p>Ajoutez d’abord un membre du personnel.</p>
+            )}
+          </details>
+        )}
       </div>
       <section className="panel">
         <h2>Personnel et branches</h2>
@@ -156,6 +161,7 @@ export function Personnel({
                   <label className="checkbox" key={s.id}>
                     <input
                       type="checkbox"
+                      disabled={!canManagePeople}
                       checked={links.some(
                         (l) => l.worker_id === w.id && l.subject_id === s.id,
                       )}
@@ -163,13 +169,11 @@ export function Personnel({
                         try {
                           await checked(
                             e.target.checked
-                              ? db
-                                  .from("web_teacher_subjects")
-                                  .insert({
-                                    school_id: school.id,
-                                    worker_id: w.id,
-                                    subject_id: s.id,
-                                  })
+                              ? db.from("web_teacher_subjects").insert({
+                                  school_id: school.id,
+                                  worker_id: w.id,
+                                  subject_id: s.id,
+                                })
                               : db
                                   .from("web_teacher_subjects")
                                   .delete()
@@ -189,6 +193,7 @@ export function Personnel({
             )}
             <button
               className="button secondary"
+              disabled={!canManagePeople}
               onClick={async () => {
                 try {
                   const rows = await checked(
@@ -222,6 +227,7 @@ export function Personnel({
                 <th>Libellé</th>
                 <th>Référence</th>
                 <th>Montant</th>
+                {canRecordPayment && <th>Notification</th>}
               </tr>
             </thead>
             <tbody>
@@ -234,6 +240,16 @@ export function Personnel({
                   <td>
                     {Number(p.amount).toLocaleString("fr-FR")} {p.currency}
                   </td>
+                  {canRecordPayment && (
+                    <td>
+                      <SendNotice
+                        schoolId={school.id}
+                        kind="staff_payment"
+                        eventId={p.id}
+                        workerId={p.worker_id}
+                      />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

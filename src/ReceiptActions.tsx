@@ -1,3 +1,4 @@
+import { SendNotice } from "./DeliveryCenter";
 import { useState } from "react";
 import { db } from "./client";
 type Row = Record<string, any>;
@@ -5,10 +6,12 @@ export function ReceiptActions({
   payment,
   school,
   student,
+  canNotify = false,
 }: {
   payment: Row;
   school: Row;
   student: Row;
+  canNotify?: boolean;
 }) {
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
@@ -68,6 +71,14 @@ export function ReceiptActions({
       <button disabled={busy} onClick={() => receipt("share")}>
         Partager · Email / WhatsApp
       </button>
+      {canNotify && (
+        <SendNotice
+          schoolId={school.id}
+          kind="payment"
+          eventId={payment.id}
+          studentId={student.id}
+        />
+      )}
       {message && (
         <small role="status">
           {message}{" "}

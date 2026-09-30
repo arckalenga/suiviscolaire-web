@@ -1,3 +1,6 @@
+import { DeliveryCenter } from "./DeliveryCenter";
+import { Attendance } from "./Attendance";
+import { FinanceDashboard } from "./FinanceDashboard";
 import { PushSettings, stopPush } from "./PushSettings";
 import { ParentManager, FamilyHome } from "./Parents";
 import { Personnel } from "./Personnel";
@@ -86,6 +89,9 @@ const nav = [
   ["marks", "Notes & devoirs", BookOpen],
   ["bulletin", "Bulletins", GraduationCap],
   ["payments", "Paiements", Wallet],
+  ["finance", "Suivi financier", Wallet],
+  ["attendance", "Présences", Users],
+  ["delivery", "Envois & contacts", MessageSquare],
   ["messages", "Communications", MessageSquare],
   ["timetable", "Emploi du temps", CalendarDays],
   ["notifications", "Notifications", Bell],
@@ -162,7 +168,17 @@ function App() {
   selectedScope.current = selected?.id || null;
   sessionScope.current = session?.user.id || null;
   const isStaff =
-    main || members.some((m) => m.role === "subadmin" && m.active);
+    main ||
+    members.some(
+      (m) =>
+        ["subadmin", "finance", "gestionnaire"].includes(m.role) && m.active,
+    );
+  const schoolRole = members.find(
+    (m) => m.school_id === selected?.id && m.active,
+  )?.role;
+  const staffView =
+    main || ["subadmin", "finance", "gestionnaire"].includes(schoolRole);
+  const canFinance = main || schoolRole === "finance";
   const manager =
     main ||
     members.some(
@@ -388,7 +404,7 @@ function App() {
     setError("");
   };
   function StudentPicker() {
-    return manager || parent ? (
+    return staffView || parent ? (
       <label className="inline-label">
         Élève
         <select
@@ -444,17 +460,22 @@ function App() {
         <nav>
           {selected &&
             nav
-              .filter(
-                ([id]) =>
-                  manager ||
-                  ![
+              .filter(([id]) => {
+                if (["settings", "parents"].includes(id)) return manager;
+                if (
+                  [
                     "students",
                     "classes",
-                    "settings",
-                    "parents",
                     "personnel",
-                  ].includes(id),
-              )
+                    "finance",
+                    "attendance",
+                    "delivery",
+                  ].includes(id)
+                )
+                  return staffView;
+                if (id === "online") return !staffView;
+                return true;
+              })
               .map(([id, label, Icon]) => (
                 <button
                   className={tab === id ? "active" : ""}
@@ -479,7 +500,9 @@ function App() {
                 {main
                   ? "Administrateur"
                   : isStaff
-                    ? "Sous-administrateur"
+                    ? { finance: "Financier", gestionnaire: "Gestionnaire" }[
+                        schoolRole as string
+                      ] || "Sous-administrateur"
                     : parent
                       ? "Parent"
                       : "Élève"}
@@ -599,14 +622,14 @@ function App() {
                 <div>
                   <div className="eyebrow">
                     {selected.city} ·{" "}
-                    {manager
+                    {staffView
                       ? "GESTION DE L’ÉTABLISSEMENT"
                       : "MON ESPACE PERSONNEL"}
                   </div>
                   <h1>{nav.find((n) => n[0] === tab)?.[1]}</h1>
                   <p>
                     {tab === "overview"
-                      ? manager
+                      ? staffView
                         ? "L’essentiel de votre école, en un coup d’œil."
                         : "Bonjour " +
                           (student?.name || "") +
@@ -634,7 +657,7 @@ function App() {
                 <>
                   {tab === "overview" && (
                     <>
-                      {manager && (
+                      {staffView && (
                         <button
                           className="button secondary"
                           onClick={() => go("personnel")}
@@ -642,7 +665,7 @@ function App() {
                           Personnel et paiements des enseignants / travailleurs
                         </button>
                       )}
-                      {!manager && (
+                      {!staffView && (
                         <StudentActions
                           go={go}
                           unread={
@@ -654,9 +677,9 @@ function App() {
                       )}
                       <div className="stats">
                         <Stat
-                          label={manager ? "Élèves inscrits" : "Ma classe"}
+                          label={staffView ? "Élèves inscrits" : "Ma classe"}
                           value={
-                            manager
+                            staffView
                               ? data.students.filter((s) => !s.archived).length
                               : student?.class_name || "—"
                           }
@@ -664,12 +687,12 @@ function App() {
                         />
                         <Stat
                           label={
-                            manager
+                            staffView
                               ? "Branches enseignées"
                               : "Moyenne des notes publiées"
                           }
                           value={
-                            manager ? data.subjects.length : average + " %"
+                            staffView ? data.subjects.length : average + " %"
                           }
                           icon={<BookOpen />}
                         />
@@ -687,7 +710,7 @@ function App() {
                         />
                       </div>
                       <div className="two-columns">
-                        {manager && (
+                        {staffView && (
                           <section className="panel">
                             <div className="panel-title">
                               <h2>Votre quotidien</h2>
@@ -759,6 +782,98 @@ function App() {
                       </div>
                     </>
                   )}
+                  {tab === "delivery" && staffView && (
+                    <DeliveryCenter
+                      key={selected.id}
+                      school={selected}
+                      students={data.students}
+                      assignments={data.assignments}
+                      marks={data.marks}
+                      messages={data.messages}
+                      canAcademic={manager}
+                      canFinance={canFinance}
+                    />
+                  )}
+                  {tab === "finance" && staffView && (
+                    <FinanceDashboard
+                      key={selected.id}
+                      school={selected}
+                      students={data.students}
+                      payments={data.payments}
+                    />
+                  )}
+                  {tab === "attendance" && staffView && (
+                    <Attendance
+                      key={selected.id}
+                      school={selected}
+                      students={data.students}
+                      classes={data.classes}
+                      canEdit={manager}
+                    />
+                  )}
+                  {tab === "overview" && staffView && (
+                    <div className="toolbar">
+                      <button className="button" onClick={() => go("finance")}>
+                        Suivi financier
+                      </button>
+                      <button
+                        className="button secondary"
+                        onClick={() => go("attendance")}
+                      >
+                        Présences
+                      </button>
+                    </div>
+                  )}
+                  {tab === "students" && staffView && !manager && (
+                    <section className="panel">
+                      <h2>Liste des élèves</h2>
+                      <Table
+                        headers={[
+                          "Nom",
+                          "Classe",
+                          "Matricule",
+                          "État",
+                          "Paiements",
+                        ]}
+                      >
+                        {data.students.map((s) => (
+                          <tr key={s.id}>
+                            <td>{s.name}</td>
+                            <td>{s.class_name}</td>
+                            <td>{s.matricule}</td>
+                            <td>{s.archived ? "Archivé" : "Actif"}</td>
+                            <td>
+                              <button
+                                className="button secondary"
+                                onClick={() => {
+                                  setStudentId(s.id);
+                                  go("payments");
+                                }}
+                              >
+                                Voir les paiements
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </Table>
+                    </section>
+                  )}
+                  {tab === "classes" && staffView && !manager && (
+                    <section className="panel">
+                      <h2>Classes et branches</h2>
+                      {data.classes.map((c) => (
+                        <p key={c.id}>{c.name}</p>
+                      ))}
+                      <Table headers={["Branche", "Domaine"]}>
+                        {data.subjects.map((c) => (
+                          <tr key={c.id}>
+                            <td>{c.name}</td>
+                            <td>{c.domain}</td>
+                          </tr>
+                        ))}
+                      </Table>
+                    </section>
+                  )}
                   {tab === "students" && manager && (
                     <StudentsManager
                       school={selected}
@@ -793,7 +908,10 @@ function App() {
                     ) : (
                       <section className="panel">
                         <div className="panel-title">
-                          <h2>Mes notes</h2>
+                          <h2>
+                            {staffView ? "Notes de l’élève" : "Mes notes"}
+                          </h2>
+                          {staffView && <StudentPicker />}
                           <span className="tag">{average} %</span>
                         </div>
                         <Table
@@ -854,11 +972,13 @@ function App() {
                       students={data.students}
                     />
                   )}
-                  {tab === "personnel" && manager && (
+                  {tab === "personnel" && staffView && (
                     <Personnel
                       key={selected.id}
                       school={selected}
                       subjects={data.subjects}
+                      canManagePeople={manager}
+                      canRecordPayment={canFinance}
                     />
                   )}
                   {tab === "bulletin" &&
@@ -971,7 +1091,7 @@ function App() {
                   {tab === "payments" && (
                     <>
                       <StudentPicker />
-                      {manager && (
+                      {canFinance && student && (
                         <details className="panel form-panel">
                           <summary>Enregistrer un paiement reçu</summary>
                           <Form
@@ -1049,6 +1169,7 @@ function App() {
                                 <td>
                                   {student && (
                                     <ReceiptActions
+                                      canNotify={canFinance}
                                       payment={p}
                                       school={selected}
                                       student={student}
@@ -1164,7 +1285,7 @@ function App() {
                               .filter(
                                 (t) =>
                                   t.day === i + 1 &&
-                                  (manager ||
+                                  (staffView ||
                                     t.class_name === student?.class_name),
                               )
                               .sort((a, b) =>
