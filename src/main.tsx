@@ -422,7 +422,7 @@ function App() {
     ) : null;
   }
   return (
-    <div className="app">
+    <div className={"app" + (!staffView ? " learner-app" : "")}>
       <aside className="sidebar no-print">
         <a className="brand" href="#/" onClick={() => go("overview")}>
           <span className="brand-icon">

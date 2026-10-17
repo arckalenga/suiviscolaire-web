@@ -175,18 +175,186 @@
 
 /* Teal complements the blue navigation without adding visual noise. */
 @media screen {
-  :root { --accent: #147d78; --accent-soft: #eaf6f3; }
-  .public-hero em, .hero-trust svg, .floating-message > svg,
-  .contact-links a > svg:first-child { color: var(--accent); }
-  .public-values .value-icon, .student-action:nth-child(even) > span {
-    color: var(--accent); background: var(--accent-soft);
+  :root {
+    --accent: #147d78;
+    --accent-soft: #eaf6f3;
   }
-  .student-action:nth-child(odd) > span { color: var(--blue); background: #edf2ff; }
-  .public-contact { background: var(--accent-soft); }
-  .public-contact .eyebrow { color: var(--accent); }
-  .green-dot, .demo-label > span { background: var(--accent); }
-  .welcome { border-left: 3px solid var(--accent); }
-  .school-card:hover, .student-action:hover { border-color: var(--accent); }
-  .stat:nth-child(2) .stat-icon { color: var(--accent); background: var(--accent-soft); }
-  .login-features svg { color: #9bd8cd; }
+  .public-hero em,
+  .hero-trust svg,
+  .floating-message > svg,
+  .contact-links a > svg:first-child {
+    color: var(--accent);
+  }
+  .public-values .value-icon,
+  .student-action:nth-child(even) > span {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .student-action:nth-child(odd) > span {
+    color: var(--blue);
+    background: #edf2ff;
+  }
+  .public-contact {
+    background: var(--accent-soft);
+  }
+  .public-contact .eyebrow {
+    color: var(--accent);
+  }
+  .green-dot,
+  .demo-label > span {
+    background: var(--accent);
+  }
+  .welcome {
+    border-left: 3px solid var(--accent);
+  }
+  .school-card:hover,
+  .student-action:hover {
+    border-color: var(--accent);
+  }
+  .stat:nth-child(2) .stat-icon {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .login-features svg {
+    color: #9bd8cd;
+  }
+}
+
+/* Student and parent workspace: clear navigation, restrained colour. */
+@media screen {
+  .app.learner-app main {
+    background: #f3f6fa;
+  }
+  .learner-intro {
+    background: #173c72;
+    color: white;
+    padding: 28px 32px;
+    border-radius: 18px;
+    margin: 0 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    border-bottom: 5px solid #26a79b;
+  }
+  .learner-intro .eyebrow {
+    color: #a9dce1;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin: 0 0 10px;
+  }
+  .learner-intro h2 {
+    color: white;
+    font-size: 28px;
+    margin: 0 0 10px;
+    letter-spacing: -0.6px;
+  }
+  .learner-intro p {
+    color: #d6e4f5;
+    margin: 0;
+    line-height: 1.6;
+  }
+  .learner-intro > svg {
+    color: #a9dce1;
+    flex-shrink: 0;
+  }
+  .learner-app .student-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .learner-app .student-action {
+    border-radius: 14px;
+    padding: 23px;
+    background: #fff;
+    border: 1px solid #dce5ef;
+    border-top: 4px solid #3767ba;
+    min-height: 170px;
+    box-shadow: 0 3px 12px #173c7206;
+  }
+  .learner-app .student-action:nth-child(3n + 2) {
+    border-top-color: #148778;
+  }
+  .learner-app .student-action:nth-child(3n) {
+    border-top-color: #bc8734;
+  }
+  .learner-app .student-action > span {
+    border-radius: 12px;
+    background: #edf3ff;
+    color: #285da9;
+    width: 46px;
+    height: 46px;
+  }
+  .learner-app .student-action:nth-child(3n + 2) > span {
+    background: #e7f6f1;
+    color: #10766b;
+  }
+  .learner-app .student-action:nth-child(3n) > span {
+    background: #fbf2df;
+    color: #96631d;
+  }
+  .learner-app .student-action h3 {
+    font-size: 16px;
+    line-height: 1.4;
+    color: #17375e;
+    margin-top: 15px;
+  }
+  .learner-app .student-action p {
+    color: #5e6f83;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .learner-app .student-action:hover {
+    background: #f9fcff;
+    border-color: #7397c8;
+    transform: translateY(-2px);
+    box-shadow: 0 7px 20px #173c7210;
+  }
+  .learner-app .student-action:focus-visible {
+    outline: 3px solid #197b9b;
+    outline-offset: 4px;
+  }
+  .learner-app .stat {
+    border-radius: 12px;
+    border: 1px solid #dce5ef;
+  }
+  .learner-app .panel {
+    border-radius: 14px;
+  }
+  @media (max-width: 1000px) {
+    .learner-app .student-actions {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 600px) {
+    .learner-intro {
+      padding: 23px;
+      gap: 12px;
+      border-radius: 12px;
+    }
+    .learner-intro h2 {
+      font-size: 23px;
+    }
+    .learner-intro > svg {
+      display: none;
+    }
+    .learner-app .student-actions {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .learner-app .student-action {
+      min-height: 132px;
+      padding: 18px 20px 18px 83px;
+      position: relative;
+    }
+    .learner-app .student-action > span {
+      position: absolute;
+      left: 20px;
+      top: 22px;
+    }
+    .learner-app .student-action h3 {
+      margin: 0 0 8px;
+    }
+  }
 }

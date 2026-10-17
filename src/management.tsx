@@ -396,51 +396,64 @@ export function StudentActions({
   unread: number;
 }) {
   return (
-    <div className="student-actions">
-      {[
-        [
-          "marks",
-          "Voir les points",
-          "Devoirs, interrogations et examens",
-          BookOpen,
-        ],
-        [
-          "payments",
-          "Voir les paiements",
-          "Retrouver les versements enregistrés",
-          Wallet,
-        ],
-        [
-          "bulletin",
-          "Voir le bulletin",
-          "Consulter et imprimer mes résultats",
-          GraduationCap,
-        ],
-        [
-          "messages",
-          "Voir les communiqués de l’école",
-          "Les informations qui me concernent",
-          MessageSquare,
-        ],
-        [
-          "notifications",
-          "Voir les notifications",
-          unread + " notification(s) non lue(s)",
-          Bell,
-        ],
-        ["online", "Payer en ligne", "Bientôt disponible", CreditCard],
-        ["timetable", "Voir l’horaire", "Organiser ma semaine", CalendarDays],
-      ].map(([id, title, body, Icon]: any) => (
-        <button className="student-action" key={id} onClick={() => go(id)}>
-          <span>
-            <Icon size={25} />
-          </span>
-          <h3>{title}</h3>
-          <p>{body}</p>
-          <ArrowRight size={17} />
-        </button>
-      ))}
-    </div>
+    <>
+      <section className="learner-intro">
+        <div>
+          <p className="eyebrow">MON ESPACE SCOLAIRE</p>
+          <h2>Chaque progrès compte.</h2>
+          <p>
+            Vos résultats, votre école et vos prochains rendez-vous, au même
+            endroit.
+          </p>
+        </div>
+        <GraduationCap size={72} strokeWidth={1.2} />
+      </section>
+      <div className="student-actions">
+        {[
+          [
+            "marks",
+            "Voir les points",
+            "Devoirs, interrogations et examens",
+            BookOpen,
+          ],
+          [
+            "payments",
+            "Voir les paiements",
+            "Retrouver les versements enregistrés",
+            Wallet,
+          ],
+          [
+            "bulletin",
+            "Voir le bulletin",
+            "Consulter et imprimer mes résultats",
+            GraduationCap,
+          ],
+          [
+            "messages",
+            "Voir les communiqués de l’école",
+            "Les informations qui me concernent",
+            MessageSquare,
+          ],
+          [
+            "notifications",
+            "Voir les notifications",
+            unread + " notification(s) non lue(s)",
+            Bell,
+          ],
+          ["online", "Payer en ligne", "Bientôt disponible", CreditCard],
+          ["timetable", "Voir l’horaire", "Organiser ma semaine", CalendarDays],
+        ].map(([id, title, body, Icon]: any) => (
+          <button className="student-action" key={id} onClick={() => go(id)}>
+            <span>
+              <Icon size={25} />
+            </span>
+            <h3>{title}</h3>
+            <p>{body}</p>
+            <ArrowRight size={17} />
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 function StudentLoginFields({ domain }: { domain: string }) {

@@ -164,3 +164,5 @@ Apply migration 20261017055144_school_branding.sql. The optional full_name and r
 Provisioning uses scripts/provision-itc-kolwezi.mjs and stores credentials only in ignored .local/itc-kolwezi-accounts.json and .local/ITC_KOLWEZI_CREDENTIALS.md. Two sous-admins, one financier, one gestionnaire, twelve fictional students and two parent accounts are school-scoped. Sample classes, subjects and payments are explicitly labelled as demonstrations and do not establish the school’s official curriculum or actual financial records. Student login addresses do not create mailboxes.
 
 Verification: scripts/test-itc-branding.mjs verifies eight representative logins, school scope and PDF downloads. PDF samples/screenshots are private QA artifacts under .local/itc-checks/.
+
+Receipt and student workspace refresh: centered school logo, boxed payment details and navy/teal amount panel. Bulletins use the national flag and DRC emblem (asset provenance in public/national/README.md), without the school logo. Downloaded and prepared email receipts share one layout.

@@ -77,13 +77,33 @@ try {
         .filter({ hasText: "I.T.C KOLWEZI" })
         .first()
         .click();
+    if (a.role === "student") {
+      await page.locator(".learner-intro").waitFor();
+      await page.screenshot({
+        path: ".local/itc-checks/student-desktop.png",
+        fullPage: true,
+      });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({
+        path: ".local/itc-checks/student-mobile.png",
+        fullPage: true,
+      });
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        true,
+      );
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    }
     await page
       .getByRole("navigation")
       .getByRole("button", { name: "Bulletins", exact: true })
       .click();
-    await page.locator(".bulletin .school-logo").waitFor();
+    await page.locator(".bulletin .national-emblem").waitFor();
+    assert.equal(await page.locator(".bulletin .school-logo").count(), 0);
     assert.equal(
-      await page.locator(".school-logo").evaluate(async (img) => {
+      await page.locator(".national-emblem").evaluate(async (img) => {
         await img.decode();
         return img.naturalWidth > 0;
       }),

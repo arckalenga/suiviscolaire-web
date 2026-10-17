@@ -1,6 +1,4 @@
-import { schoolLogoPath } from "./school-branding";
 import { Fragment } from "react";
-import { GraduationCap } from "lucide-react";
 import { reportModel, reportNumber } from "./report-model";
 type Row = Record<string, any>;
 export function Bulletin({
@@ -59,16 +57,12 @@ export function Bulletin({
           </strong>
           <p>BULLETIN SCOLAIRE</p>
         </div>
-        {schoolLogoPath(school) ? (
-          <img
-            className="school-logo"
-            src={schoolLogoPath(school)!}
-            alt={"Logo de " + school.name}
-            style={{ width: 76, height: 76, objectFit: "contain" }}
-          />
-        ) : (
-          <GraduationCap size={48} />
-        )}
+        <img
+          className="national-emblem"
+          src="./national/drc-emblem.png"
+          alt="Emblème de la République démocratique du Congo"
+          style={{ width: 64, height: 76, objectFit: "contain" }}
+        />
       </div>
       <div className="bulletin-identity">
         <div>

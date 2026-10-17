@@ -7,7 +7,7 @@ const clean = (value: string) =>
 export function buildBulletinPdf(
   element: HTMLElement,
   filename: string,
-  schoolLogo?: string,
+  nationalEmblem?: string,
 ) {
   const table = element.querySelector<HTMLTableElement>(".report-table");
   if (!table) throw Error("Bulletin indisponible.");
@@ -22,9 +22,30 @@ export function buildBulletinPdf(
   });
   const width = doc.internal.pageSize.getWidth(),
     height = doc.internal.pageSize.getHeight();
-  if (element.querySelector(".school-logo") && !schoolLogo)
+  if (element.querySelector(".national-emblem") && !nationalEmblem)
     throw Error("Le logo doit être chargé avant de créer le PDF.");
-  if (schoolLogo) doc.addImage(schoolLogo, "PNG", width - 30, 7, 23, 23);
+  if (nationalEmblem)
+    doc.addImage(nationalEmblem, "PNG", width - 27, 6, 20, 24);
+  doc.saveGraphicsState();
+  doc.rect(7, 10, 26, 17, null).clip().discardPath();
+  doc.setFillColor(0, 164, 222).rect(7, 10, 26, 17, "F");
+  doc.setDrawColor(255, 215, 0).setLineWidth(5).line(8, 26, 32, 11);
+  doc.setDrawColor(216, 26, 43).setLineWidth(3).line(8, 26, 32, 11);
+  doc.setFillColor(255, 215, 0);
+  const star = Array.from({ length: 10 }, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5,
+      r = i % 2 ? 1.1 : 2.6;
+    return [12 + Math.cos(a) * r, 15 + Math.sin(a) * r];
+  });
+  doc.lines(
+    star.slice(1).map((p, i) => [p[0] - star[i][0], p[1] - star[i][1]]),
+    star[0][0],
+    star[0][1],
+    [1, 1],
+    "F",
+    true,
+  );
+  doc.restoreGraphicsState();
   const margin = 7,
     contentWidth = width - 2 * margin;
   doc.setProperties({
@@ -32,11 +53,11 @@ export function buildBulletinPdf(
     author: "SuiviScolaire",
     subject: "Bulletin scolaire",
   });
-  doc.setFont("helvetica", "bold").setFontSize(11).setTextColor(22, 42, 68);
+  doc.setFont("helvetica", "bold").setFontSize(9).setTextColor(22, 42, 68);
   doc.text("RÉPUBLIQUE DÉMOCRATIQUE DU CONGO", width / 2, 15, {
     align: "center",
   });
-  doc.setFontSize(8);
+  doc.setFontSize(6.5);
   doc.text(
     "MINISTÈRE DE L'ÉDUCATION NATIONALE ET NOUVELLE CITOYENNETÉ",
     width / 2,
@@ -168,7 +189,7 @@ export async function downloadBulletinPdf(
   filename: string,
 ) {
   const source = element
-    .querySelector<HTMLImageElement>(".school-logo")
+    .querySelector<HTMLImageElement>(".national-emblem")
     ?.getAttribute("src");
   const doc = buildBulletinPdf(
     element,

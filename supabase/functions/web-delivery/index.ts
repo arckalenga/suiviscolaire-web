@@ -1,3 +1,4 @@
+import { drawReceipt } from "../_shared/receipt-layout.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 import { jsPDF } from "npm:jspdf@4.2.1";
 import {
@@ -215,6 +216,7 @@ Deno.serve(async (req) => {
         };
         if (["payment", "staff_payment"].includes(b.kind)) {
           const doc = new jsPDF();
+          let receiptLogo: Uint8Array | undefined;
           if (school.logo_key === "itc-kolwezi") {
             const logo = await fetch(
               "https://suiviscolaire.info/school-logos/itc-kolwezi.png",
@@ -223,19 +225,9 @@ Deno.serve(async (req) => {
             if (!logo.ok) throw Error("School logo unavailable");
             const bytes = new Uint8Array(await logo.arrayBuffer());
             if (bytes.length > 3000000) throw Error("Invalid logo");
-            doc.addImage(bytes, "PNG", 158, 10, 32, 32);
+            receiptLogo = bytes;
           }
-          doc.setFontSize(16);
-          doc.text(message.subject, 18, 22);
-          doc.setFontSize(11);
-          doc.text(
-            doc.splitTextToSize(
-              (school.full_name ? school.full_name + "\n" : "") + message.text,
-              170,
-            ),
-            18,
-            48,
-          );
+          drawReceipt(doc, event, school, person, receiptLogo);
           payload.attachments = [
             {
               filename: "recu-" + event.id + ".pdf",
