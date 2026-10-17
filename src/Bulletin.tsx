@@ -1,3 +1,4 @@
+import { schoolLogoPath } from "./school-branding";
 import { Fragment } from "react";
 import { GraduationCap } from "lucide-react";
 import { reportModel, reportNumber } from "./report-model";
@@ -58,13 +59,23 @@ export function Bulletin({
           </strong>
           <p>BULLETIN SCOLAIRE</p>
         </div>
-        <GraduationCap size={48} />
+        {schoolLogoPath(school) ? (
+          <img
+            className="school-logo"
+            src={schoolLogoPath(school)!}
+            alt={"Logo de " + school.name}
+            style={{ width: 76, height: 76, objectFit: "contain" }}
+          />
+        ) : (
+          <GraduationCap size={48} />
+        )}
       </div>
       <div className="bulletin-identity">
         <div>
           <p>
             ÉCOLE : <strong>{school.name}</strong>
           </p>
+          {school.full_name && <p>{school.full_name}</p>}
           <p>VILLE : {school.city}</p>
           <p>ANNÉE SCOLAIRE : {school.academic_year}</p>
         </div>

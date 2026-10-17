@@ -26,7 +26,7 @@ export function ReceiptActions({
         .single();
       if (error || !p) throw Error();
       const { makeReceipt } = await import("./receipt-pdf");
-      const doc = makeReceipt(p, school, student),
+      const doc = await makeReceipt(p, school, student),
         name = "recu-" + p.id + ".pdf";
       if (mode === "download") doc.save(name);
       else if (mode === "print") {

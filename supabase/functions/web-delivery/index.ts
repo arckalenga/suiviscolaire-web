@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
       );
     const { data: school } = await scoped
       .from("web_schools")
-      .select("name")
+      .select("name,full_name,logo_key")
       .eq("id", b.school_id)
       .single();
     if (!school) return reply({ error: "École introuvable." }, 404);
@@ -215,10 +215,27 @@ Deno.serve(async (req) => {
         };
         if (["payment", "staff_payment"].includes(b.kind)) {
           const doc = new jsPDF();
+          if (school.logo_key === "itc-kolwezi") {
+            const logo = await fetch(
+              "https://suiviscolaire.info/school-logos/itc-kolwezi.png",
+              { signal: AbortSignal.timeout(15000), redirect: "error" },
+            );
+            if (!logo.ok) throw Error("School logo unavailable");
+            const bytes = new Uint8Array(await logo.arrayBuffer());
+            if (bytes.length > 3000000) throw Error("Invalid logo");
+            doc.addImage(bytes, "PNG", 158, 10, 32, 32);
+          }
           doc.setFontSize(16);
           doc.text(message.subject, 18, 22);
           doc.setFontSize(11);
-          doc.text(doc.splitTextToSize(message.text, 170), 18, 40);
+          doc.text(
+            doc.splitTextToSize(
+              (school.full_name ? school.full_name + "\n" : "") + message.text,
+              170,
+            ),
+            18,
+            48,
+          );
           payload.attachments = [
             {
               filename: "recu-" + event.id + ".pdf",

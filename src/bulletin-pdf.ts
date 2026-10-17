@@ -1,9 +1,14 @@
+import { logoData } from "./school-branding";
 import { jsPDF } from "jspdf";
 import { autoTable, type CellInput } from "jspdf-autotable";
 
 const clean = (value: string) =>
   value.replace(/[’‘]/g, "'").replace(/[—–]/g, "-").replace(/\s+/g, " ").trim();
-export function buildBulletinPdf(element: HTMLElement, filename: string) {
+export function buildBulletinPdf(
+  element: HTMLElement,
+  filename: string,
+  schoolLogo?: string,
+) {
   const table = element.querySelector<HTMLTableElement>(".report-table");
   if (!table) throw Error("Bulletin indisponible.");
   const columns = Array.from(table.rows[0].cells).reduce(
@@ -17,6 +22,9 @@ export function buildBulletinPdf(element: HTMLElement, filename: string) {
   });
   const width = doc.internal.pageSize.getWidth(),
     height = doc.internal.pageSize.getHeight();
+  if (element.querySelector(".school-logo") && !schoolLogo)
+    throw Error("Le logo doit être chargé avant de créer le PDF.");
+  if (schoolLogo) doc.addImage(schoolLogo, "PNG", width - 30, 7, 23, 23);
   const margin = 7,
     contentWidth = width - 2 * margin;
   doc.setProperties({
@@ -159,6 +167,13 @@ export async function downloadBulletinPdf(
   element: HTMLElement,
   filename: string,
 ) {
-  const doc = buildBulletinPdf(element, filename);
+  const source = element
+    .querySelector<HTMLImageElement>(".school-logo")
+    ?.getAttribute("src");
+  const doc = buildBulletinPdf(
+    element,
+    filename,
+    source ? await logoData(source) : undefined,
+  );
   await doc.save(filename, { returnPromise: true });
 }

@@ -154,3 +154,13 @@ Les nouveaux rôles sont limités à leurs écoles par RLS. web_manage reste ré
 Appliquer les migrations 20260930125544_school_finance_attendance.sql et 20260930130232_delivery_contacts.sql après les migrations précédentes. Déployer web-manage-accounts (avec student-access.ts) et web-delivery (avec delivery-policy.ts). Ces fonctions valident elles-mêmes le JWT via getUser ; verify_jwt est désactivé uniquement au niveau passerelle.
 
 Validation : 23 tests unitaires, TypeScript/build, scripts/test-school-operations.mjs (cinq rôles et aperçu Excel), scripts/test-delivery-access.mjs (huit comptes, école autorisée, absence de configuration), tests/finance-attendance-permissions.sql (transaction annulée). Aucun email ou WhatsApp réel envoyé.
+
+## I.T.C KOLWEZI
+
+School name: I.T.C KOLWEZI. Full name: Institut technique du cinquantenaire de Kolwezi. Its supplied logo is preserved unchanged in public/school-logos/itc-kolwezi.png. The school-specific logo and full name appear on the HTML/print bulletin, downloaded bulletin PDF and payment receipts, including the prepared email receipt template. Other schools retain their existing document appearance.
+
+Apply migration 20261017055144_school_branding.sql. The optional full_name and restricted logo_key fields use existing school RLS. Logo downloads fail visibly rather than silently exporting an unbranded document.
+
+Provisioning uses scripts/provision-itc-kolwezi.mjs and stores credentials only in ignored .local/itc-kolwezi-accounts.json and .local/ITC_KOLWEZI_CREDENTIALS.md. Two sous-admins, one financier, one gestionnaire, twelve fictional students and two parent accounts are school-scoped. Sample classes, subjects and payments are explicitly labelled as demonstrations and do not establish the school’s official curriculum or actual financial records. Student login addresses do not create mailboxes.
+
+Verification: scripts/test-itc-branding.mjs verifies eight representative logins, school scope and PDF downloads. PDF samples/screenshots are private QA artifacts under .local/itc-checks/.

@@ -1,15 +1,22 @@
+import { logoData, schoolLogoPath } from "./school-branding";
 import { jsPDF } from "jspdf";
-export function makeReceipt(
+export async function makeReceipt(
   p: Record<string, any>,
   school: Record<string, any>,
   student: Record<string, any>,
 ) {
   const doc = new jsPDF();
+  const source = schoolLogoPath(school);
+  if (source) doc.addImage(await logoData(source), "PNG", 158, 14, 32, 32);
   doc.setTextColor(25, 55, 99);
   doc.setFontSize(21);
   doc.text("REÇU DE PAIEMENT", 20, 25);
   doc.setFontSize(13);
-  doc.text(doc.splitTextToSize(school.name, 170), 20, 39);
+  doc.text(doc.splitTextToSize(school.name, source ? 130 : 170), 20, 39);
+  if (school.full_name) {
+    doc.setFontSize(10);
+    doc.text(doc.splitTextToSize(school.full_name, 170), 20, 50);
+  }
   doc.setTextColor(35);
   const rows = [
     ["Élève", student.name],
@@ -20,7 +27,7 @@ export function makeReceipt(
     ["Référence", p.reference],
     ["Identifiant du reçu", p.id],
   ];
-  let y = 60;
+  let y = school.full_name ? 68 : 60;
   doc.setFontSize(11);
   for (const [label, value] of rows) {
     doc.setFont("helvetica", "bold");
